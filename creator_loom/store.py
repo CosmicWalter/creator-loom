@@ -59,7 +59,30 @@ class Store:
                   state TEXT NOT NULL, continuity TEXT, reason TEXT,
                   created TEXT DEFAULT CURRENT_TIMESTAMP, accepted TEXT);
                 CREATE INDEX IF NOT EXISTS episodes_series ON series_episodes(series_id,position);
+                CREATE TABLE IF NOT EXISTS subscriptions (
+                  id TEXT PRIMARY KEY, url TEXT NOT NULL UNIQUE, keywords TEXT NOT NULL,
+                  transport TEXT NOT NULL DEFAULT 'urllib',
+                  enabled INTEGER NOT NULL DEFAULT 1, version INTEGER NOT NULL DEFAULT 1,
+                  interval_seconds INTEGER NOT NULL, next_check REAL NOT NULL DEFAULT 0,
+                  last_checked REAL, last_error TEXT, lease_token TEXT, lease_until REAL);
+                CREATE TABLE IF NOT EXISTS research_items (
+                  id TEXT PRIMARY KEY, source TEXT NOT NULL UNIQUE, payload TEXT NOT NULL,
+                  sha256 TEXT NOT NULL, revision INTEGER NOT NULL,
+                  state TEXT NOT NULL DEFAULT 'inbox', decision_revision INTEGER,
+                  review_note TEXT, proposal_id TEXT);
+                CREATE TABLE IF NOT EXISTS research_revisions (
+                  item_id TEXT NOT NULL, revision INTEGER NOT NULL, payload TEXT NOT NULL,
+                  sha256 TEXT NOT NULL, observed REAL NOT NULL, PRIMARY KEY(item_id,revision));
+                CREATE TABLE IF NOT EXISTS research_sightings (
+                  subscription_id TEXT NOT NULL, item_id TEXT NOT NULL, relevance TEXT NOT NULL,
+                  first_seen REAL NOT NULL, last_seen REAL NOT NULL, PRIMARY KEY(subscription_id,item_id));
+                CREATE TABLE IF NOT EXISTS feed_runs (
+                  id TEXT PRIMARY KEY, subscription_id TEXT NOT NULL, outcome TEXT NOT NULL,
+                  report TEXT NOT NULL, checked REAL NOT NULL);
             ''')
+            db.execute("BEGIN IMMEDIATE")
+            if "transport" not in {r[1] for r in db.execute("PRAGMA table_info(subscriptions)")}:
+                db.execute("ALTER TABLE subscriptions ADD COLUMN transport TEXT NOT NULL DEFAULT 'urllib'")
 
     @contextmanager
     def connect(self):

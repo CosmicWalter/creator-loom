@@ -3,7 +3,7 @@
 Three different learning loops must remain distinguishable:
 
 1. **Personalization**: an explicit profile preference snapshot changes prompts; a reviewed score changes that profile's routing prior for a specific format/stage and model signature. Execution measurements inform conservative latency estimates and smoothed reliability within the same scope. Changing the backend or generation limits isolates its history. No cross-profile or cross-task feedback sharing. These estimates are heuristics, not measured proof of the best creative model.
-2. **Technique updates**: public feed discovery → human-authored, sourced editorial guidance → experimental runs → paired review → activation → possible rollback.
+2. **Technique updates**: subscribed public feed collection → deduplicated, versioned research inbox → human-reviewed evidence and editorial guidance → experimental runs → paired review → activation → possible rollback. Feed revisions do not rewrite a proposed technique's frozen evidence.
 3. **Creator development**: `coach` produces medium-specific review questions and a deliberate-revision exercise bound to actual artifacts. `practice` retains a changed revision, original hash, rubric dimension, before/after scores and a rationale. `progress` aggregates self-reported revision deltas per profile. These records support reflection, but do not prove that users become more skilled.
 
 ## Paired review file
@@ -44,7 +44,7 @@ These are small human-scored experiments. They can be biased or noisy; passing i
 
 ## Threat boundaries
 
-Feed ingestion is an explicit command, not a background scheduler. Only supported public HTTPS feed hosts are fetched, redirects are rejected, document types are rejected and response size is limited. Fetched content is never executed or automatically promoted. Discovery does not verify scientific claims, license rights or runtime compatibility.
+Feed ingestion runs manually or in an explicitly started foreground `research-worker --watch`. Per-source due times and short leases survive restarts. Only supported public HTTPS feed hosts are fetched, redirects are rejected, document types are rejected and response size is limited. Python TLS is the default; an explicit system curl transport retains certificate validation and disables personal curl configuration. Fetched content is never executed or automatically promoted. Discovery does not verify scientific claims, license rights or runtime compatibility. See [research inbox](research-inbox.md) for the version/review contract.
 
 Techniques contain short editorial instructions and source links, not executable plugins. A source link is evidence to inspect, not a verified endorsement. This version does not install dependencies, download weights, rewrite source code, change production services, or publish content automatically. Such future capabilities need sandboxed proposals, reproducible evaluation and explicit deployment records.
 

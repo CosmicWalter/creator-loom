@@ -1,7 +1,7 @@
 """Original source fixtures and simulated inference test the long-form workflow."""
 
 import io
-from contextlib import redirect_stdout
+from contextlib import closing, redirect_stdout
 import json
 import sqlite3
 import tempfile
@@ -215,7 +215,7 @@ class LibrarySeriesTest(unittest.TestCase):
     def test_schema_upgrade_preserves_prior_run_rows(self):
         legacy = self.root / "legacy"
         legacy.mkdir()
-        with sqlite3.connect(legacy / "loom.sqlite3") as db:
+        with closing(sqlite3.connect(legacy / "loom.sqlite3")) as db, db:
             db.execute("CREATE TABLE runs(id TEXT PRIMARY KEY,brief TEXT NOT NULL,plan TEXT NOT NULL,status TEXT NOT NULL,created TEXT DEFAULT CURRENT_TIMESTAMP)")
             db.execute("INSERT INTO runs(id,brief,plan,status) VALUES('legacy','{}','{}','approved')")
         upgraded = Store(legacy)

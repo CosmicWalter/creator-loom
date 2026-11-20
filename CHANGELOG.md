@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.0
+
+- Persist public RSS/Atom subscriptions, polling intervals, source versions and short fetch leases; collect due sources once or through an explicitly started foreground worker.
+- Deduplicate canonical evidence links across sources, retain distinct metadata revisions, preserve review decisions and expose stale reviews after material changes.
+- Rank inbox entries through explained literal keyword matches, with explicit dismissal/reopening and optimistic review revisions.
+- Atomically turn reviewed evidence into a proposed editorial technique, freezing the source snapshot and human rationale. Existing paired evaluation, activation and rollback gates still apply.
+- Harden feed parsing, public URLs, body limits, redirects and error retention. Add explicit system curl transport for native CA trust without disabling TLS or inheriting user curl configuration.
+
 ## 0.4.0
 
 - Import explicitly authorized TXT and unencrypted EPUB sources, preserve original/source-unit hashes and split long chapters into bounded units without copying local filenames or source paths.

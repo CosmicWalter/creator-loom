@@ -4,6 +4,7 @@ import argparse
 import json
 import sqlite3
 import sys
+import time
 from pathlib import Path
 
 from .domain import Brief, RECIPES, identifier
@@ -14,6 +15,7 @@ from .routing import load_cards
 from .store import Store
 from .library import Library
 from .series import Series
+from .research import Research
 
 
 def emit(value):
@@ -58,7 +60,9 @@ def main(argv=None):
     p.add_argument("--set", help='JSON object, e.g. {"tone":"concise"}')
     sub.add_parser("forget").add_argument("profile")
     sub.add_parser("models")
-    sub.add_parser("discover").add_argument("feed")
+    p = sub.add_parser("discover")
+    p.add_argument("feed")
+    p.add_argument("--transport", choices=["urllib", "curl"], default="urllib")
     p = sub.add_parser("propose")
     p.add_argument("id")
     p.add_argument("--source", required=True)
@@ -111,6 +115,40 @@ def main(argv=None):
     p.add_argument("--base-version", type=int, required=True)
     p.add_argument("--reason", required=True)
     p.add_argument("--provider-checked", action="store_true")
+    p = sub.add_parser("source-add")
+    p.add_argument("id")
+    p.add_argument("url")
+    p.add_argument("--keyword", action="append", default=[])
+    p.add_argument("--interval", type=int, default=21600)
+    p.add_argument("--transport", choices=["urllib", "curl"], default="urllib")
+    sub.add_parser("sources")
+    p = sub.add_parser("source-set")
+    p.add_argument("id")
+    p.add_argument("--base-version", type=int, required=True)
+    flags = p.add_mutually_exclusive_group(required=True)
+    flags.add_argument("--enabled", action="store_true")
+    flags.add_argument("--disabled", action="store_true")
+    words = p.add_mutually_exclusive_group()
+    words.add_argument("--keyword", action="append")
+    words.add_argument("--clear-keywords", action="store_true")
+    p.add_argument("--interval", type=int)
+    p.add_argument("--transport", choices=["urllib", "curl"])
+    p = sub.add_parser("research-refresh")
+    p.add_argument("source", nargs="?")
+    p = sub.add_parser("research-worker")
+    p.add_argument("--watch", action="store_true", help="Run foreground due-source polling until interrupted")
+    p.add_argument("--poll-seconds", type=int, default=60)
+    p = sub.add_parser("research-inbox")
+    p.add_argument("--state", choices=["inbox", "dismissed", "proposed", "changed", "all"], default="inbox")
+    sub.add_parser("research-show").add_argument("item")
+    for command in ["research-dismiss", "research-reopen", "research-propose"]:
+        p = sub.add_parser(command)
+        p.add_argument("item")
+        p.add_argument("--base-revision", type=int, required=True)
+        p.add_argument("--note", required=True)
+        if command == "research-propose":
+            p.add_argument("technique")
+            p.add_argument("--guidance", required=True)
     args = parser.parse_args(argv)
     try:
         store = Store(args.data)
@@ -120,6 +158,7 @@ def main(argv=None):
         coach = Coach(store, engine)
         library = Library(store)
         series = Series(store, engine)
+        research = Research(store, learning)
         if args.command in {"plan", "create"}:
             brief = brief_from(args)
             if not args.book and (args.unit != 0 or args.continuity):
@@ -152,11 +191,11 @@ def main(argv=None):
             identifier(args.profile)
             store.forget(args.profile)
             emit({"status": "preferences_routing_feedback_and_measurements_deleted",
-                  "retained": "books, series continuity, creative runs, artifacts (including embedded metrics), practice, evaluations and audit events"})
+                  "retained": "research subscriptions/evidence, books, series continuity, creative runs, artifacts (including embedded metrics), practice, evaluations and audit events"})
         elif args.command == "models":
             emit([m.to_dict() for m in cards])
         elif args.command == "discover":
-            emit(discover(args.feed))
+            emit(discover(args.feed, args.transport))
         elif args.command == "propose":
             learning.propose(args.id, args.source, args.guidance)
             emit({"state": "proposed"})
@@ -196,7 +235,37 @@ def main(argv=None):
             emit(series.accept(args.series, args.run, args.continuity, args.base_version))
         elif args.command == "series-reject":
             emit(series.reject(args.series, args.run, args.base_version, args.reason, args.provider_checked))
+        elif args.command == "source-add":
+            emit(research.subscribe(args.id, args.url, args.keyword, args.interval, args.transport))
+        elif args.command == "sources":
+            emit(research.sources())
+        elif args.command == "source-set":
+            emit(research.configure(args.id, args.base_version, args.enabled,
+                                    [] if args.clear_keywords else args.keyword, args.interval, args.transport))
+        elif args.command == "research-refresh":
+            emit(research.refresh(args.source) if args.source else research.tick())
+        elif args.command == "research-worker":
+            if not 1 <= args.poll_seconds <= 60:
+                raise ValueError("Worker poll interval must be 1–60 seconds")
+            while True:
+                emit(research.tick())
+                if not args.watch:
+                    break
+                try:
+                    time.sleep(args.poll_seconds)
+                except KeyboardInterrupt:
+                    break
+        elif args.command == "research-inbox":
+            emit(research.inbox(args.state))
+        elif args.command == "research-show":
+            emit(research.inspect(args.item))
+        elif args.command in {"research-dismiss", "research-reopen", "research-propose"}:
+            emit(research.review(args.item, args.base_revision, args.note,
+                                 getattr(args, "technique", None), getattr(args, "guidance", None),
+                                 args.command == "research-reopen"))
         return 0
+    except KeyboardInterrupt:
+        return 130
     except (ValueError, KeyError, TypeError, OSError, sqlite3.Error) as exc:
         # Provider exceptions never expose their bodies; config and local errors remain actionable.
         print(f"loom: {exc}", file=sys.stderr)

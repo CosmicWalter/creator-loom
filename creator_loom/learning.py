@@ -1,49 +1,9 @@
 from __future__ import annotations
 
 import json
-import urllib.request
-import xml.etree.ElementTree as ET
-from urllib.parse import urlsplit
 
 from .domain import bounded, identifier
-from . import __version__
-
-
-def source_url(url):
-    u = urlsplit(url)
-    if u.scheme != "https" or not u.hostname or u.username or u.password or u.fragment:
-        raise ValueError("Evidence requires a public HTTPS source without credentials or fragments")
-    return url
-
-
-def discover(url):
-    """Explicitly fetched public release feeds; fetched text is never executable."""
-    from .adapters import NoRedirect
-    source_url(url)
-    if urlsplit(url).hostname not in {"github.com", "huggingface.co", "arxiv.org", "export.arxiv.org"}:
-        raise ValueError("Discovery supports GitHub, Hugging Face and arXiv feeds only")
-    request = urllib.request.Request(url, headers={"User-Agent": f"creator-loom/{__version__}"})
-    with urllib.request.build_opener(NoRedirect).open(request, timeout=20) as response:
-        raw = response.read(2 * 1024 * 1024 + 1)
-    if len(raw) > 2 * 1024 * 1024 or b"<!DOCTYPE" in raw.upper():
-        raise ValueError("Feed is oversized or contains a document type declaration")
-    root = ET.fromstring(raw)
-    entries = list(root.findall("{http://www.w3.org/2005/Atom}entry")) + list(root.findall(".//item"))
-    results = []
-    for entry in entries[:20]:
-        def field(name):
-            return entry.find(name) if entry.find(name) is not None else entry.find("{http://www.w3.org/2005/Atom}" + name)
-        title, link = field("title"), field("link")
-        if title is None or link is None:
-            continue
-        href = link.get("href") or link.text or ""
-        try:
-            source_url(href)
-        except ValueError:
-            continue
-        results.append({"title": "".join(title.itertext())[:500], "source": href,
-                        "state": "discovered", "trusted_for_execution": False})
-    return results
+from .feeds import discover, source_url
 
 
 class Learning:
@@ -51,17 +11,22 @@ class Learning:
         self.store, self.engine = store, engine
 
     def propose(self, name, source, guidance):
+        with self.store.connect() as db:
+            self.propose_in(db, name, source, guidance)
+
+    def propose_in(self, db, name, source, guidance, origin=None):
         identifier(name)
         source_url(source)
         if not isinstance(guidance, str) or not 1 <= len(guidance.strip()) <= 2000:
             raise ValueError("Guidance must contain 1–2000 characters")
-        with self.store.connect() as db:
-            active = db.execute("SELECT id,payload FROM techniques WHERE state='active'").fetchone()
-            payload = {"source": source, "guidance": guidance,
-                       "baseline": active["id"] if active else None,
-                       "baseline_snapshot": json.loads(active["payload"]) if active else None}
-            db.execute("INSERT INTO techniques(id,payload,state) VALUES(?,?,'proposed')", (name, json.dumps(payload)))
-            self.store.event(db, "proposed", name, payload)
+        active = db.execute("SELECT id,payload FROM techniques WHERE state='active'").fetchone()
+        payload = {"source": source, "guidance": guidance,
+                   "baseline": active["id"] if active else None,
+                   "baseline_snapshot": json.loads(active["payload"]) if active else None}
+        if origin is not None:
+            payload["origin"] = origin
+        db.execute("INSERT INTO techniques(id,payload,state) VALUES(?,?,'proposed')", (name, json.dumps(payload)))
+        self.store.event(db, "proposed", name, payload)
 
     def evaluate(self, name, pairs):
         identifier(name)

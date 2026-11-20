@@ -108,7 +108,7 @@ loom feedback RUN_ID draft 0.8
 loom forget default
 ```
 
-`forget` 删除偏好、用于路由的反馈与调用指标，阻止这些历史继续影响选择；不删除导入书籍、系列连续性笔记、作品、作品内保存的指标、评测或审计日志。当前 profile 是本机偏好分组，不是隔离租户或认证账号。
+`forget` 删除偏好、用于路由的反馈与调用指标，阻止这些历史继续影响选择；不删除研究订阅与资料、导入书籍、系列连续性笔记、作品、作品内保存的指标、评测或审计日志。当前 profile 是本机偏好分组，不是隔离租户或认证账号。
 
 ## 创作者练习
 
@@ -125,6 +125,27 @@ loom progress default
 练习保存原稿摘要、修改稿副本、量表维度和评分理由，拒绝把未改动的稿件算作练习。不同 profile 的记录分开统计。评分属于人工自评，不是已验证的学习增益，也不证明产品使用户能力提高；后续需要盲评和长期样本。`forget` 不删除练习，当前如需彻底删除所有本机数据，需自行备份后删除数据目录。
 
 ## 学习与迭代
+
+可以保存公开 RSS／Atom 订阅，让前台 Worker 按各订阅的间隔收集资料，再从收件箱中评审新方法：
+
+```sh
+loom source-add comfyui https://github.com/Comfy-Org/ComfyUI/releases.atom \
+  --keyword video --keyword audio --keyword image --interval 21600
+loom research-refresh comfyui
+loom research-inbox
+loom research-show ITEM_ID
+loom research-propose ITEM_ID feed-technique --base-revision 1 \
+  --note '已阅读这条资料，准备验证其中一个具体且适用于当前任务的编辑方法。' \
+  --guidance '填写经过人工整理、可在现有创作流程中验证的具体方法。'
+
+# 默认只检查一次到期订阅；--watch 才会持续前台轮询，不安装后台服务。
+loom research-worker
+loom research-worker --watch
+```
+
+相同链接会去重；内容变更保留修订，已有忽略决定和实验提案不会被覆盖。`research-inbox --state changed` 查看评审后变化的资料。相关性是标题／摘要的字面关键词匹配，显示命中词，不声称自动识别技术突破。提案保存该版本的证据、摘要和评审理由，仍须通过下面的实验与启用关卡。
+
+默认使用 Python HTTPS；若本机 Python 缺少系统信任的 CA，可显式选择 `--transport curl`（用于 `discover`、`source-add` 或 `source-set`）。该模式使用系统 curl，跳过个人 curl 配置，保留证书校验、禁止跳转并限制响应大小。订阅、版本、失败重试与信任边界见 [研究收件箱](docs/research-inbox.md)。
 
 ```sh
 # 读取公开 release feed；不自动安装或运行其中任何内容。

@@ -29,7 +29,9 @@ This is a delivery backlog, not a promise that the complete product is already a
 
 ## Learning system and open benchmark
 
-- [ ] Saved source subscriptions, relevance extraction, deduplication and proposal inbox.
+- [x] Saved public source subscriptions, literal keyword triage, deduplicated/versioned evidence and reviewed proposal inbox.
+- [x] Foreground due-source collector with leases, persistent intervals and isolated source failures.
+- [ ] Semantic technique synthesis, license/compatibility review and automated experiment proposals beyond editorial guidance.
 - [ ] Sandboxed adapter/recipe proposals; regression suites, signed releases and reversible migrations.
 - [ ] Blind paired creative reviews, held-out briefs, budget-matched provider comparisons.
 - [ ] Outcome-based model calibration, fallback decisions and auditable cost accounting.
