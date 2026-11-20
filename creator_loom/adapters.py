@@ -2,13 +2,16 @@ from __future__ import annotations
 
 import base64
 import html
+import io
 import json
 import subprocess
 import urllib.error
 import urllib.request
+import wave
 from pathlib import Path
 
 from .domain import ModelCard
+from . import __version__
 
 
 class ProviderUncertain(RuntimeError):
@@ -21,7 +24,7 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 
 
 def remote(card: ModelCard, suffix: str, body: dict, key: str) -> bytes:
-    headers = {"Content-Type": "application/json", "User-Agent": "creator-loom/0.1"}
+    headers = {"Content-Type": "application/json", "User-Agent": f"creator-loom/{__version__}"}
     if key:
         headers["Authorization"] = f"Bearer {key}"
     request = urllib.request.Request(card.endpoint.rstrip("/") + suffix,
@@ -68,6 +71,14 @@ def execute(card, prompt, dependencies, directory, key=""):
                      "voice": "alloy", "response_format": "wav"}, key)
         if not (raw[:4] == b"RIFF" and raw[8:12] == b"WAVE"):
             raise ValueError("Expected WAV speech output")
+        try:
+            with wave.open(io.BytesIO(raw), "rb") as audio:
+                if audio.getnframes() < 1 or audio.getnchannels() not in {1, 2}:
+                    raise ValueError("Speech output must contain mono or stereo audio")
+                if audio.getnframes() * audio.getnchannels() * audio.getsampwidth() != len(audio.readframes(audio.getnframes())):
+                    raise ValueError("Speech WAV is truncated")
+        except (wave.Error, EOFError):
+            raise ValueError("Speech provider returned an unsupported WAV encoding") from None
         path = directory / "narration.wav"
         path.write_bytes(raw)
         return path
@@ -92,13 +103,20 @@ def execute(card, prompt, dependencies, directory, key=""):
     if card.adapter == "render":
         if len(dependencies) != 2:
             raise ValueError("Video rendering requires image and narration")
+        probe = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration",
+                                "-of", "json", str(dependencies[1])], capture_output=True, timeout=20)
+        if probe.returncode:
+            raise ValueError("Narration could not be inspected")
+        duration = float(json.loads(probe.stdout)["format"]["duration"])
+        if not 0 < duration <= 600:
+            raise ValueError("Narration must be 0–600 seconds; split long scripts before rendering")
         path = directory / "film.mp4"
         result = subprocess.run([
             "ffmpeg", "-nostdin", "-y", "-loglevel", "error", "-loop", "1",
             "-i", str(dependencies[0]), "-i", str(dependencies[1]),
             "-vf", "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,setsar=1",
             "-c:v", "libx264", "-tune", "stillimage", "-pix_fmt", "yuv420p", "-r", "24",
-            "-c:a", "aac", "-shortest", "-t", "600", "-map_metadata", "-1",
+            "-c:a", "aac", "-shortest", "-t", str(duration), "-map_metadata", "-1",
             "-movflags", "+faststart", str(path)], capture_output=True, timeout=180)
         if result.returncode:
             raise ValueError("FFmpeg rendering failed; inspect input media locally")

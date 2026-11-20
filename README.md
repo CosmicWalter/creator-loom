@@ -43,9 +43,9 @@ loom --config config.local.json execute RUN_ID
 | --- | --- | --- |
 | `chat` | `/chat/completions` → Markdown | 非流式，最多请求 2048 输出 token |
 | `image` | `/images/generations` → base64 PNG | 单张 1024×1024；不自动下载返回 URL |
-| `speech` | `/audio/speech` → WAV | 默认 `alloy`；不包含声音克隆 |
+| `speech` | `/audio/speech` → PCM WAV | 默认 `alloy`；不包含声音克隆 |
 | `cover` | 本地图形 → SVG + PPM | 模板设计，不是生成式模型 |
-| `render` | 图片 + 旁白 → H.264/AAC MP4 | 系统需安装 FFmpeg；静态配图视频，最长 10 分钟 |
+| `render` | 图片 + 旁白 → H.264/AAC MP4 | 系统需安装 FFmpeg/FFprobe；静态配图视频，旁白超过 10 分钟会拒绝而非截断 |
 
 本地 HTTP 模型只能使用 loopback；远端接口要求 HTTPS，拒绝 URL 内凭据和重定向。`--local-only` 禁止向远端模型发内容，但无法证明 loopback 服务内部没有再调用云服务。
 
@@ -64,7 +64,7 @@ loom --config config.local.json execute RUN_ID
 
 ## 模型决策
 
-每个步骤保存模型快照、候选分数、排除理由和偏好快照。先按能力、隐私、预算估计、语言、输入上限、延迟目标和凭据可用性过滤；再以质量 75%、费用 15%、速度 10% 排序。
+每个步骤保存模型快照、候选分数、排除理由和偏好快照。先按能力、隐私、预算估计、语言、输入上限、延迟目标和凭据可用性过滤；再以质量 75%、费用 15%、速度 10% 计分。联合搜索整条流程的模型组合，在总预算和总延迟估计内最大化各步得分之和，避免前一步花光预算。分数以同一总预算归一化；最多检查一百万种组合，超限会要求缩小启用模型集合，不会静默退回近似结果。
 
 质量使用模型卡先验与**该 profile、该模态**的实际人工评分，先验相当于四次观察，避免一次点击覆盖所有历史。同一产物重复评分会更新记录，不会增加样本。现有计划不会因后来改了配置、偏好或评分而悄悄变化。
 
@@ -77,6 +77,20 @@ loom forget default
 ```
 
 `forget` 删除偏好与用于路由的反馈，不删除作品、评测或审计日志。当前 profile 是本机偏好分组，不是隔离租户或认证账号。
+
+## 创作者练习
+
+完成作品后，可按各模态的编辑量表审阅，保存一次明确的修改，并记录修改前后的同量表评分：
+
+```sh
+loom coach RUN_ID
+# 人工保存修改后的文稿为 revision.md，再记录具体的编辑理由。
+loom practice RUN_ID draft --revision revision.md --dimension clarity \
+  --before 0.4 --after 0.7 --rationale '补充一个具体例子，让开头的核心观点更容易理解。'
+loom progress default
+```
+
+练习保存原稿摘要、修改稿副本、量表维度和评分理由，拒绝把未改动的稿件算作练习。不同 profile 的记录分开统计。评分属于人工自评，不是已验证的学习增益，也不证明产品使用户能力提高；后续需要盲评和长期样本。`forget` 不删除练习，当前如需彻底删除所有本机数据，需自行备份后删除数据目录。
 
 ## 学习与迭代
 

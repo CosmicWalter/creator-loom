@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 import io
+import base64
 import json
 import os
 import shutil
+import struct
+import subprocess
 import tempfile
 import threading
 import unittest
 import wave
+import zlib
 from concurrent.futures import ThreadPoolExecutor
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -15,6 +19,7 @@ from unittest.mock import patch
 
 from creator_loom import adapters
 from creator_loom.domain import Brief, ModelCard
+from creator_loom.coaching import Coach
 from creator_loom.engine import Engine
 from creator_loom.learning import Learning
 from creator_loom.routing import choose, load_cards
@@ -145,6 +150,24 @@ class SystemTest(unittest.TestCase):
         self.assertEqual(self.store.preferences("default"), {})
         self.assertEqual(self.store.run(run)["status"], "ready")
 
+    def test_joint_allocation_preserves_budget_for_later_steps(self):
+        premium = self.card("premium", quality=1.0, cost=0.8)
+        economical = self.card("economical", quality=0.7, cost=0.2)
+        speech = ModelCard("speaker", "audio", "speech", model="speech",
+                           endpoint="http://127.0.0.1:8765/v1", cost=0.5, max_chars=30000)
+        plan = Engine(self.store, [premium, economical, speech]).plan(Brief("A story", "podcast", budget=1))
+        self.assertEqual(plan["steps"][0]["model"]["id"], "economical")
+        self.assertAlmostEqual(plan["estimated_cost"], 0.7)
+        self.assertEqual(plan["allocation"]["combinations"], 2)
+        self.assertEqual(plan["allocation"]["feasible"], 1)
+
+    def test_joint_allocation_rejects_infeasible_total_latency(self):
+        writer = self.card(latency=200)
+        speech = ModelCard("speaker", "audio", "speech", model="speech",
+                           endpoint="http://127.0.0.1:8765/v1", latency=200, max_chars=30000)
+        with self.assertRaisesRegex(ValueError, "No complete workflow"):
+            Engine(self.store, [writer, speech]).plan(Brief("A story", "podcast", max_latency=300))
+
     def test_artifact_cannot_escape_run_directory(self):
         with self.assertRaises(ValueError):
             self.engine.artifact("run", {"file": "../../loom.sqlite3", "sha256": "fake"})
@@ -179,6 +202,65 @@ class SystemTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "distinct"):
             learning.evaluate("specificity", [pair] * 3)
 
+    def test_evaluation_rejects_model_and_preference_confounds(self):
+        learning = Learning(self.store, self.engine)
+        learning.propose("specificity", "https://example.com/research", "Use concrete details.")
+        baseline = self.approved("Same topic")
+        self.store.set_preferences("default", {"tone": "changed during experiment"})
+        candidate = self.approved("Same topic", "specificity")
+        pair = {"baseline": baseline, "candidate": candidate, "baseline_score": 0.5,
+                "candidate_score": 0.9, "rationale": "This experiment changed more than its technique."}
+        with self.assertRaisesRegex(ValueError, "freeze model and preference"):
+            learning.evaluate("specificity", [pair] * 3)
+        self.store.forget("default")
+        altered = Engine(self.store, [self.card(name="another-model")])
+        candidate = altered.create(Brief("Same topic"), "specificity")
+        with patch.object(adapters, "execute", self.fake_writer):
+            altered.execute(candidate)
+        altered.approve(candidate)
+        pair["candidate"] = candidate
+        with self.assertRaisesRegex(ValueError, "freeze model and preference"):
+            learning.evaluate("specificity", [pair] * 3)
+
+    def test_promotion_rechecks_evaluated_artifact_hashes(self):
+        learning = Learning(self.store, self.engine)
+        learning.propose("specificity", "https://example.com/research", "Use concrete details.")
+        pairs = []
+        for i in range(3):
+            pairs.append({"baseline": self.approved(f"Topic {i}"),
+                          "candidate": self.approved(f"Topic {i}", "specificity"),
+                          "baseline_score": 0.5, "candidate_score": 0.7,
+                          "rationale": "Synthetic test score fixture for artifact binding."})
+        learning.evaluate("specificity", pairs)
+        run = self.store.run(pairs[0]["candidate"])
+        self.engine.artifact(run["id"], run["steps"][0]["result"]).write_text("Replaced after evaluation")
+        with self.assertRaisesRegex(ValueError, "changed"):
+            learning.promote("specificity")
+
+    def test_coaching_records_actual_changed_revision_and_profile_progress(self):
+        run = self.approved("Original story")
+        coach = Coach(self.store, self.engine)
+        workbook = coach.workbook(run)
+        self.assertIn("clarity", workbook["stages"][0]["rubric"])
+        revision = self.root / "edited.md"
+        revision.write_text("A deliberately revised test story with one concrete example.")
+        result = coach.record(run, "draft", revision, "clarity", 0.4, 0.7,
+                              "Added a concrete example to explain the opening idea.")
+        self.assertAlmostEqual(result["delta"], 0.3)
+        self.engine.artifact(run, result["artifact"])
+        self.assertEqual(coach.progress("default")["dimensions"][0]["attempts"], 1)
+        self.assertEqual(coach.progress("another-user")["dimensions"], [])
+
+    def test_practice_rejects_unchanged_artifact_and_wrong_rubric(self):
+        run = self.approved("Original story")
+        coach = Coach(self.store, self.engine)
+        state = self.store.run(run)
+        original = self.engine.artifact(run, state["steps"][0]["result"])
+        with self.assertRaisesRegex(ValueError, "changed artifact"):
+            coach.record(run, "draft", original, "clarity", 0.1, 0.9, "No actual change was made.")
+        with self.assertRaisesRegex(ValueError, "rubric"):
+            coach.record(run, "draft", original, "pacing", 0.1, 0.9, "Incorrect rubric for this medium.")
+
     def test_invalid_model_values_and_endpoint_secrets_rejected(self):
         for value in [float("nan"), float("inf"), -0.1, True]:
             with self.assertRaises(ValueError):
@@ -209,6 +291,13 @@ class ProviderContractTest(unittest.TestCase):
                         audio.setframerate(8000)
                         audio.writeframes(b"\0\0" * 4000)
                     raw = data.getvalue()
+                elif self.path.endswith("/images/generations"):
+                    def chunk(kind, data):
+                        return struct.pack("!I", len(data)) + kind + data + struct.pack("!I", zlib.crc32(kind+data))
+                    png = b"\x89PNG\r\n\x1a\n"
+                    png += chunk(b"IHDR", struct.pack("!2I5B", 1, 1, 8, 2, 0, 0, 0))
+                    png += chunk(b"IDAT", zlib.compress(b"\0\x50\x90\xb0")) + chunk(b"IEND", b"")
+                    raw = json.dumps({"data": [{"b64_json": base64.b64encode(png).decode()}]}).encode()
                 else:
                     raw = json.dumps({"choices": [{"message": {"content": "An original ocean story."}}]}).encode()
                 self.send_response(200)
@@ -247,7 +336,19 @@ class ProviderContractTest(unittest.TestCase):
         self.assertNotIn("test-only-credential", (self.store.root / "loom.sqlite3").read_bytes().decode(errors="replace"))
         engine.approve(run)
 
-    @unittest.skipUnless(shutil.which("ffmpeg"), "FFmpeg is an optional system dependency")
+    def test_real_http_image_contract(self):
+        image = ModelCard("image", "image", "image", model="test-image", endpoint=self.endpoint,
+                          local=True, quality=0.9)
+        engine = Engine(self.store, [image])
+        run = engine.create(Brief("Ocean cover", "cover", local_only=True))
+        result = engine.execute(run)
+        output = engine.artifact(run, result["steps"][0]["result"])
+        self.assertEqual(output.suffix, ".png")
+        self.assertEqual(self.calls[0][0], "/v1/images/generations")
+        self.assertEqual(self.calls[0][1]["response_format"], "b64_json")
+        engine.approve(run)
+
+    @unittest.skipUnless(shutil.which("ffmpeg") and shutil.which("ffprobe"), "FFmpeg/FFprobe are optional system dependencies")
     def test_actual_ffmpeg_bookcast_with_mock_inference(self):
         engine = Engine(self.store, self.cards())
         with patch.dict(os.environ, {"LOOM_TEST_KEY": "test-only-credential"}):
@@ -256,6 +357,12 @@ class ProviderContractTest(unittest.TestCase):
         self.assertEqual(result["status"], "needs_review")
         film = engine.artifact(run, result["steps"][-1]["result"])
         self.assertIn(b"ftyp", film.read_bytes()[:64])
+        inspection = json.loads(subprocess.check_output([
+            "ffprobe", "-v", "error", "-show_streams", "-show_format", "-of", "json", str(film)]))
+        self.assertEqual({s["codec_type"] for s in inspection["streams"]}, {"video", "audio"})
+        self.assertAlmostEqual(float(inspection["format"]["duration"]), 0.5, delta=0.15)
+        video = next(s for s in inspection["streams"] if s["codec_type"] == "video")
+        self.assertEqual((video["width"], video["height"]), (1280, 720))
         self.assertEqual(len(self.calls), 2)
         engine.approve(run)
 

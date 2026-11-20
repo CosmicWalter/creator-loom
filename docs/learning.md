@@ -4,7 +4,7 @@ Three different learning loops must remain distinguishable:
 
 1. **Personalization**: an explicit profile preference snapshot changes prompts; a reviewed score changes that profile's routing prior for one modality. No cross-profile feedback sharing.
 2. **Technique updates**: public feed discovery → human-authored, sourced editorial guidance → experimental runs → paired review → activation → possible rollback.
-3. **Creator development**: future editorial exercises, self-assessment and progress evidence. This is not yet implemented; preference storage alone does not prove that users become more skilled.
+3. **Creator development**: `coach` produces medium-specific review questions and a deliberate-revision exercise bound to actual artifacts. `practice` retains a changed revision, original hash, rubric dimension, before/after scores and a rationale. `progress` aggregates self-reported revision deltas per profile. These records support reflection, but do not prove that users become more skilled.
 
 ## Paired review file
 
@@ -38,7 +38,9 @@ Create baseline and experimental runs for at least three distinct topics. The br
 
 Numbers above illustrate the file format; they are not measured results. Scores are normalized 0–1. Current gate: average improvement at least 0.05, no individual regression greater than 0.1. Artifacts are rehashed at evaluation and promotion. Reused topics or run IDs, missing review, wrong technique provenance and different briefs are rejected.
 
-These are small human-scored experiments. They can be biased, insufficiently controlled or noisy; passing is permission for a reversible local trial, not proof of universal improvement. Future work should freeze model snapshots and all non-technique factors, support blind scoring, holdout samples and confidence intervals.
+Models, model parameters represented in their cards, profile preferences, workflow steps and the baseline technique are now frozen and checked between pairs. A proposal records the active technique at proposal time; promotion is rejected if that active baseline has since changed. This controls some confounds, but not stochastic generation, reviewer expectations, provider-side version changes or all other factors.
+
+These are small human-scored experiments. They can be biased or noisy; passing is permission for a reversible local trial, not proof of universal improvement. Blind scoring, holdout samples, richer generation parameters and confidence intervals remain future work.
 
 ## Threat boundaries
 

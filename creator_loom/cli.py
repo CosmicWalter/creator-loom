@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 from .domain import Brief, RECIPES, identifier
+from .coaching import Coach
 from .engine import Engine
 from .learning import Learning, discover
 from .routing import load_cards
@@ -54,12 +55,23 @@ def main(argv=None):
     for command in ["promote", "rollback"]:
         sub.add_parser(command).add_argument("id")
     sub.add_parser("techniques")
+    sub.add_parser("coach").add_argument("run")
+    p = sub.add_parser("practice")
+    p.add_argument("run")
+    p.add_argument("step")
+    p.add_argument("--revision", type=Path, required=True)
+    p.add_argument("--dimension", required=True)
+    p.add_argument("--before", type=float, required=True)
+    p.add_argument("--after", type=float, required=True)
+    p.add_argument("--rationale", required=True)
+    sub.add_parser("progress").add_argument("profile")
     args = parser.parse_args(argv)
     try:
         store = Store(args.data)
         cards = load_cards(args.config)
         engine = Engine(store, cards)
         learning = Learning(store, engine)
+        coach = Coach(store, engine)
         if args.command in {"plan", "create"}:
             brief = Brief(args.topic, args.format, args.language, args.profile, args.budget,
                           args.local_only, args.max_latency)
@@ -90,7 +102,7 @@ def main(argv=None):
             identifier(args.profile)
             store.forget(args.profile)
             emit({"status": "preferences_and_routing_feedback_deleted",
-                  "retained": "creative runs, artifacts, evaluations and audit events"})
+                  "retained": "creative runs, artifacts, practice, evaluations and audit events"})
         elif args.command == "models":
             emit([m.to_dict() for m in cards])
         elif args.command == "discover":
@@ -109,6 +121,13 @@ def main(argv=None):
         elif args.command == "techniques":
             with store.connect() as db:
                 emit([dict(r) for r in db.execute("SELECT * FROM techniques ORDER BY id")])
+        elif args.command == "coach":
+            emit(coach.workbook(args.run))
+        elif args.command == "practice":
+            emit(coach.record(args.run, args.step, args.revision, args.dimension,
+                              args.before, args.after, args.rationale))
+        elif args.command == "progress":
+            emit(coach.progress(args.profile))
         return 0
     except (ValueError, KeyError, TypeError, OSError, sqlite3.Error) as exc:
         # Provider exceptions never expose their bodies; config and local errors remain actionable.

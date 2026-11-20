@@ -32,6 +32,12 @@ class Store:
                 CREATE TABLE IF NOT EXISTS events (
                   id INTEGER PRIMARY KEY, kind TEXT NOT NULL, subject TEXT NOT NULL,
                   payload TEXT NOT NULL, created TEXT DEFAULT CURRENT_TIMESTAMP);
+                CREATE TABLE IF NOT EXISTS practice (
+                  id TEXT PRIMARY KEY, profile TEXT NOT NULL, run_id TEXT NOT NULL,
+                  step_id TEXT NOT NULL, dimension TEXT NOT NULL,
+                  before_score REAL NOT NULL, after_score REAL NOT NULL,
+                  rationale TEXT NOT NULL, artifact TEXT NOT NULL,
+                  created TEXT DEFAULT CURRENT_TIMESTAMP);
             ''')
 
     @contextmanager

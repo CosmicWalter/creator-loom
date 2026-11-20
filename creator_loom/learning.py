@@ -6,6 +6,7 @@ import xml.etree.ElementTree as ET
 from urllib.parse import urlsplit
 
 from .domain import bounded, identifier
+from . import __version__
 
 
 def source_url(url):
@@ -21,7 +22,7 @@ def discover(url):
     source_url(url)
     if urlsplit(url).hostname not in {"github.com", "huggingface.co", "arxiv.org", "export.arxiv.org"}:
         raise ValueError("Discovery supports GitHub, Hugging Face and arXiv feeds only")
-    request = urllib.request.Request(url, headers={"User-Agent": "creator-loom/0.1"})
+    request = urllib.request.Request(url, headers={"User-Agent": f"creator-loom/{__version__}"})
     with urllib.request.build_opener(NoRedirect).open(request, timeout=20) as response:
         raw = response.read(2 * 1024 * 1024 + 1)
     if len(raw) > 2 * 1024 * 1024 or b"<!DOCTYPE" in raw.upper():
@@ -54,8 +55,11 @@ class Learning:
         source_url(source)
         if not isinstance(guidance, str) or not 1 <= len(guidance.strip()) <= 2000:
             raise ValueError("Guidance must contain 1–2000 characters")
-        payload = {"source": source, "guidance": guidance}
         with self.store.connect() as db:
+            active = db.execute("SELECT id,payload FROM techniques WHERE state='active'").fetchone()
+            payload = {"source": source, "guidance": guidance,
+                       "baseline": active["id"] if active else None,
+                       "baseline_snapshot": json.loads(active["payload"]) if active else None}
             db.execute("INSERT INTO techniques(id,payload,state) VALUES(?,?,'proposed')", (name, json.dumps(payload)))
             self.store.event(db, "proposed", name, payload)
 
@@ -63,6 +67,11 @@ class Learning:
         identifier(name)
         if not isinstance(pairs, list) or len(pairs) < 3:
             raise ValueError("At least three paired approved runs are required")
+        with self.store.connect() as db:
+            row = db.execute("SELECT * FROM techniques WHERE id=?", (name,)).fetchone()
+            if not row or row["state"] not in {"proposed", "evaluated"}:
+                raise ValueError("Only proposed or evaluated techniques can be evaluated")
+            proposal = json.loads(row["payload"])
         topics, runs, deltas, bindings = set(), set(), [], []
         for pair in pairs:
             baseline, candidate = self.store.run(pair["baseline"]), self.store.run(pair["candidate"])
@@ -72,6 +81,16 @@ class Learning:
                 raise ValueError("Paired runs must have exactly the same brief")
             if candidate["plan"]["technique"] != name or baseline["plan"]["technique"] == name:
                 raise ValueError("Candidate technique provenance mismatch")
+            if (baseline["plan"]["technique"] != proposal["baseline"] or
+                    baseline["plan"]["technique_snapshot"] != proposal["baseline_snapshot"] or
+                    candidate["plan"]["technique_snapshot"] != proposal):
+                raise ValueError("Evaluation does not match the proposal's frozen baseline")
+            def context(plan):
+                return {"preferences": plan["preferences"],
+                        "steps": [{k: step[k] for k in ["id", "capability", "dependencies", "model"]}
+                                  for step in plan["steps"]]}
+            if context(baseline["plan"]) != context(candidate["plan"]):
+                raise ValueError("Paired evaluation must freeze model and preference context")
             topic = baseline["brief"]["topic"]
             if topic in topics or baseline["id"] in runs or candidate["id"] in runs:
                 raise ValueError("Evaluation needs distinct topics and run pairs")
@@ -91,7 +110,7 @@ class Learning:
         mean = sum(deltas) / len(deltas)
         result = {"mean_delta": mean, "worst_delta": min(deltas), "pairs": pairs,
                   "bindings": bindings, "passed": mean >= 0.05 - 1e-9 and min(deltas) >= -0.1 - 1e-9,
-                  "method": "human-scored paired evaluation; not statistical proof"}
+                  "proposal": proposal, "method": "human-scored paired evaluation; not statistical proof"}
         with self.store.connect() as db:
             row = db.execute("SELECT state FROM techniques WHERE id=?", (name,)).fetchone()
             if not row or row[0] not in {"proposed", "evaluated"}:
@@ -107,6 +126,8 @@ class Learning:
             if not row or row["state"] != "evaluated" or not row["evaluation"]:
                 raise ValueError("Technique must be evaluated before activation")
             evaluation = json.loads(row["evaluation"])
+            if evaluation["proposal"] != json.loads(row["payload"]):
+                raise ValueError("Proposal changed after evaluation")
             if not evaluation["passed"]:
                 raise ValueError("Evaluation did not pass")
             for binding in evaluation["bindings"]:
@@ -115,6 +136,8 @@ class Learning:
                     for supplement in result["supplements"]:
                         self.engine.artifact(binding["run"], supplement)
             previous = db.execute("SELECT id FROM techniques WHERE state='active'").fetchone()
+            if (previous[0] if previous else None) != evaluation["proposal"]["baseline"]:
+                raise ValueError("Active baseline changed; evaluate a new proposal against the current baseline")
             db.execute("UPDATE techniques SET state='retired' WHERE state='active'")
             db.execute("UPDATE techniques SET state='active',previous_state=? WHERE id=?",
                        (previous[0] if previous else None, name))

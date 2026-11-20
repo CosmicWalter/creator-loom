@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import itertools
+import math
 import os
 import shutil
 from pathlib import Path
@@ -44,8 +46,8 @@ def choose(cards, store, *, profile, capability, language, chars, budget, local_
             reasons.append("language unsupported")
         if card.api_key_env and not os.environ.get(card.api_key_env):
             reasons.append("credential environment variable missing")
-        if card.adapter == "render" and not shutil.which("ffmpeg"):
-            reasons.append("ffmpeg not installed")
+        if card.adapter == "render" and (not shutil.which("ffmpeg") or not shutil.which("ffprobe")):
+            reasons.append("ffmpeg or ffprobe not installed")
         if reasons:
             rejected.append({"model": card.id, "reasons": reasons})
             continue
@@ -62,3 +64,39 @@ def choose(cards, store, *, profile, capability, language, chars, budget, local_
         raise ValueError(f"No eligible {capability} model: {json.dumps(rejected, ensure_ascii=False)}")
     accepted.sort(key=lambda x: (-x["score"], x["model"]))
     return Decision(accepted[0]["model"], accepted[0]["score"], accepted, rejected)
+
+
+def allocate(cards, store, brief, requests):
+    """Find the best feasible joint allocation for a small explicit workflow.
+
+    Every step is scored against the same total budget/latency normalization.
+    Exhaustive search gives a reproducible optimum under those estimates, not
+    a claim that self-reported model priors predict actual creative quality.
+    """
+    decisions = [choose(cards, store, profile=brief.profile, capability=r["capability"],
+                        language=brief.language, chars=r["chars"], budget=brief.budget,
+                        local_only=brief.local_only, max_latency=brief.max_latency)
+                 for r in requests]
+    combinations = math.prod(len(d.candidates) for d in decisions)
+    if combinations > 1000000:
+        raise ValueError("Model catalog creates more than one million allocations; narrow enabled models")
+    by_id = {m.id: m for m in cards}
+    best, best_key, feasible = None, None, 0
+    for options in itertools.product(*(d.candidates for d in decisions)):
+        cost = sum(by_id[o["model"]].cost for o in options)
+        latency = sum(by_id[o["model"]].latency for o in options)
+        if cost > brief.budget + 1e-9 or latency > brief.max_latency + 1e-9:
+            continue
+        feasible += 1
+        score = sum(o["score"] for o in options)
+        key = (-score, cost, latency, tuple(o["model"] for o in options))
+        if best_key is None or key < best_key:
+            best, best_key = options, key
+    if best is None:
+        raise ValueError("No complete workflow fits the configured total budget and latency estimates")
+    for decision, option in zip(decisions, best):
+        decision.selected = option["model"]
+        decision.score = option["score"]
+    return decisions, {"method": "exact joint allocation under configured estimates",
+                       "combinations": combinations, "feasible": feasible,
+                       "total_score": -best_key[0]}

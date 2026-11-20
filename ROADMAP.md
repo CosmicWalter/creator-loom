@@ -9,9 +9,10 @@ This is a delivery backlog, not a promise that the complete product is already a
 - [x] Model/technique/preference snapshots, local state, submit-once behavior and artifact-bound review.
 - [x] Profile-specific feedback, public feed reading, sourced technique proposals, paired review, activation and rollback.
 - [x] Loopback provider contract tests and real FFmpeg pipeline tests with simulated inference.
-- [ ] Global workflow model allocation instead of greedy step selection.
-- [ ] Stronger evaluation controls: frozen model/preference contexts and holdout sets.
-- [ ] Structured lessons, review rubrics and creator practice artifacts.
+- [x] Global workflow model allocation instead of greedy step selection.
+- [x] Stronger evaluation controls: frozen model/preference contexts and active baseline checks.
+- [x] Review rubrics, changed revision artifacts and self-reported creator practice progress.
+- [ ] Holdout sets, blind reviews and independently measured creator skill gains.
 
 ## Real creative delivery
 

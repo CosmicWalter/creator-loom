@@ -9,7 +9,7 @@ from pathlib import Path
 
 from . import adapters
 from .domain import Brief, ModelCard, RECIPES, identifier
-from .routing import choose
+from .routing import allocate
 
 
 def digest(path):
@@ -34,7 +34,7 @@ class Engine:
                 row = db.execute("SELECT * FROM techniques WHERE state='active'").fetchone()
                 guidance = json.loads(row["payload"]) if row else None
                 technique = row["id"] if row else None
-        steps, cost, latency = [], 0.0, 0.0
+        steps, requests, cost, latency = [], [], 0.0, 0.0
         # Reserve for a complete upstream response, not only the topic length.
         for name, capability, dependencies in RECIPES[brief.format]:
             base = f"{brief.topic}\nFormat: {brief.format}; stage: {name}; language: {brief.language}.\n"
@@ -48,17 +48,17 @@ class Engine:
             if guidance:
                 base += "\nEditorial technique: " + guidance["guidance"]
             chars = len(base) + 9000 * sum(1 for d in dependencies if d not in {"cover", "narration"})
-            decision = choose(self.cards, self.store, profile=brief.profile, capability=capability,
-                              language=brief.language, chars=chars, budget=max(0, brief.budget-cost),
-                              local_only=brief.local_only, max_latency=max(0, brief.max_latency-latency))
+            requests.append({"capability": capability, "chars": chars})
+            steps.append({"id": name, "capability": capability, "dependencies": dependencies, "prompt": base})
+        decisions, allocation = allocate(self.cards, self.store, brief, requests)
+        for step, decision in zip(steps, decisions):
             card = next(m for m in self.cards if m.id == decision.selected)
             cost += card.cost
             latency += card.latency
-            steps.append({"id": name, "capability": capability, "dependencies": dependencies,
-                          "prompt": base, "model": card.to_dict(), "decision": decision.to_dict()})
+            step.update({"model": card.to_dict(), "decision": decision.to_dict()})
         return {"brief": asdict(brief), "preferences": preferences, "technique": technique,
                 "technique_snapshot": guidance, "estimated_cost": round(cost, 8),
-                "estimated_latency": latency, "steps": steps}
+                "estimated_latency": latency, "allocation": allocation, "steps": steps}
 
     def create(self, brief: Brief, technique=None):
         plan = self.plan(brief, technique)

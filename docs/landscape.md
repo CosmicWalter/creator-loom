@@ -13,7 +13,7 @@ Reviewed 2026-11-21 against primary project documentation. This is a capability/
 
 A creative brief should produce both an editable artifact and an explanation of the decisions behind it. Model selection should depend on the task, privacy, budget, observed outcomes and the creator's preferences. Improvements should enter through evidence and evaluations, with a reversible activation record. A creator should gain practical editorial skills, not only more generated files.
 
-Only the basic orchestration, explainable routing, profile feedback and reviewed prompt-technique lifecycle exist today. These principles are not claims of unique invention or demonstrated superiority. The creator-learning experience, continuous evidence ingestion, objective multimodal quality evaluation and stronger model decision policies remain work in progress.
+Basic orchestration, joint workflow model allocation, profile feedback, reviewed prompt-technique updates and deliberate-revision exercises exist today. These principles are not claims of unique invention or demonstrated superiority. The broader creator-learning experience, continuous evidence ingestion and objective multimodal quality evaluation remain work in progress.
 
 ## How to compare fairly
 
