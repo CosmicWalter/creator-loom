@@ -25,7 +25,7 @@ class Engine:
     def __init__(self, store, cards):
         self.store, self.cards = store, cards
 
-    def plan(self, brief: Brief, technique=None, context=None):
+    def plan(self, brief: Brief, technique=None, context=None, model_overrides=None, stop_after=None):
         if context is not None:
             Library(self.store).validate_context(context)
             context = json.loads(json.dumps(context, ensure_ascii=False))
@@ -42,10 +42,19 @@ class Engine:
                 row = db.execute("SELECT * FROM techniques WHERE state='active'").fetchone()
                 guidance = json.loads(row["payload"]) if row else None
                 technique = row["id"] if row else None
+        recipe = RECIPES[brief.format]
+        names = [s[0] for s in recipe]
+        if stop_after is not None:
+            if stop_after not in names:
+                raise ValueError("Unknown isolated task stage")
+            recipe = recipe[:names.index(stop_after)+1]
+        model_overrides = {} if model_overrides is None else model_overrides
+        if not isinstance(model_overrides, dict) or any(k not in [s[0] for s in recipe] or not isinstance(v, str) for k, v in model_overrides.items()):
+            raise ValueError("Model overrides must identify stages in this plan")
         steps, requests, cost, latency = [], [], 0.0, 0.0
         # The allocator reserves each selected upstream writer's enforced output
         # character bound, including the exact source-data envelope.
-        for name, capability, dependencies in RECIPES[brief.format]:
+        for name, capability, dependencies in recipe:
             base = f"{brief.topic}\nFormat: {brief.format}; stage: {name}; language: {brief.language}.\n"
             if name == "outline":
                 base += "Create a structured story outline with characters and continuity constraints.\n"
@@ -64,7 +73,8 @@ class Engine:
             text_inputs = [{"index": i, "header_chars": len(f"\nSource {s['id']} (data):\n")}
                            for i, s in enumerate(steps) if s["id"] in dependencies and s["capability"] == "text"]
             requests.append({"capability": capability, "chars": len(base), "task": task,
-                             "text_inputs": text_inputs})
+                             "text_inputs": text_inputs,
+                             "models": [model_overrides[name]] if name in model_overrides else None})
             steps.append({"id": name, "task": task, "capability": capability, "dependencies": dependencies, "prompt": base})
         decisions, allocation = allocate(self.cards, self.store, brief, requests)
         for step, decision in zip(steps, decisions):
@@ -75,6 +85,7 @@ class Engine:
         for step, reserved in zip(steps, allocation["reserved_input_chars"]):
             step["reserved_input_chars"] = reserved
         return {"brief": asdict(brief), "context": context, "preferences": preferences, "technique": technique,
+                "isolated_task": f"{brief.format}:{stop_after}" if stop_after else None,
                 "technique_snapshot": guidance, "estimated_cost": round(cost, 8),
                 "estimated_latency": latency, "allocation": allocation, "steps": steps}
 
@@ -108,9 +119,18 @@ class Engine:
         with run_lock(self.store, run_id):
             return self._drive(run_id, resume=True)
 
-    def _drive(self, run_id, resume):
+    def _drive(self, run_id, resume, benchmark=False):
         identifier(run_id)
         snapshot = self.store.run(run_id)
+        if snapshot["plan"].get("benchmark"):
+            if not resume and not benchmark:
+                raise ValueError("Use benchmark-generate to preserve the comparison protocol")
+            with self.store.connect() as db:
+                case = db.execute("""SELECT c.partition,b.state FROM benchmark_cases c
+                  JOIN benchmarks b ON b.id=c.benchmark_id
+                  WHERE c.baseline_run=? OR c.candidate_run=?""", (run_id, run_id)).fetchone()
+            if not case or (case["partition"] == "holdout" and case["state"] == "development"):
+                raise ValueError("Holdout execution is locked until development reviews are sealed")
         expected_status = "ready"
         if resume:
             if snapshot["status"] not in {"waiting_external", "executing"}:

@@ -1,0 +1,73 @@
+{
+  "task": "article:draft",
+  "baseline_model": "local-writer",
+  "candidate_model": "cloud-writer",
+  "cases": [
+    {
+      "id": "case-1",
+      "brief": {
+        "topic": "写一篇原创短文，解释如何在雨天观察窗边的植物",
+        "format": "article",
+        "language": "zh",
+        "profile": "benchmark",
+        "budget": 1,
+        "max_latency": 300
+      }
+    },
+    {
+      "id": "case-2",
+      "brief": {
+        "topic": "写一篇原创短文，介绍第一次制作纸风车的过程",
+        "format": "article",
+        "language": "zh",
+        "profile": "benchmark",
+        "budget": 1,
+        "max_latency": 300
+      }
+    },
+    {
+      "id": "case-3",
+      "brief": {
+        "topic": "写一篇原创短文，描绘一座虚构小镇的清晨",
+        "format": "article",
+        "language": "zh",
+        "profile": "benchmark",
+        "budget": 1,
+        "max_latency": 300
+      }
+    },
+    {
+      "id": "case-4",
+      "brief": {
+        "topic": "写一篇原创短文，解释如何整理一周阅读笔记",
+        "format": "article",
+        "language": "zh",
+        "profile": "benchmark",
+        "budget": 1,
+        "max_latency": 300
+      }
+    },
+    {
+      "id": "case-5",
+      "brief": {
+        "topic": "写一篇原创短文，描述一次虚构的夜间观星活动",
+        "format": "article",
+        "language": "zh",
+        "profile": "benchmark",
+        "budget": 1,
+        "max_latency": 300
+      }
+    },
+    {
+      "id": "case-6",
+      "brief": {
+        "topic": "写一篇原创短文，介绍如何设计一个桌面故事游戏",
+        "format": "article",
+        "language": "zh",
+        "profile": "benchmark",
+        "budget": 1,
+        "max_latency": 300
+      }
+    }
+  ]
+}

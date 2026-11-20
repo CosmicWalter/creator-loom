@@ -89,6 +89,14 @@ class Store:
                 CREATE TABLE IF NOT EXISTS web_actions (
                   id TEXT PRIMARY KEY, run_id TEXT NOT NULL, operation TEXT NOT NULL,
                   status TEXT NOT NULL, error TEXT);
+                CREATE TABLE IF NOT EXISTS benchmarks (
+                  id TEXT PRIMARY KEY, protocol TEXT NOT NULL, state TEXT NOT NULL,
+                  report TEXT, created TEXT DEFAULT CURRENT_TIMESTAMP);
+                CREATE TABLE IF NOT EXISTS benchmark_cases (
+                  benchmark_id TEXT NOT NULL, id TEXT NOT NULL, partition TEXT NOT NULL,
+                  baseline_run TEXT NOT NULL UNIQUE, candidate_run TEXT NOT NULL UNIQUE,
+                  display_order TEXT NOT NULL, scores TEXT, rationale TEXT,
+                  PRIMARY KEY(benchmark_id,id));
             ''')
             db.execute("BEGIN IMMEDIATE")
             if "transport" not in {r[1] for r in db.execute("PRAGMA table_info(subscriptions)")}:
@@ -181,9 +189,13 @@ class Store:
         from .domain import bounded
         bounded(rating, 0, 1, "rating")
         run = self.run(run_id)
+        if run["plan"].get("benchmark"):
+            raise ValueError("Benchmark scores enter routing only through holdout calibration")
         step = next((s for s in run["steps"] if s["id"] == step_id), None)
         if not step or step["status"] != "done":
             raise ValueError("Feedback requires a completed step")
+        if step["result"].get("reused_from"):
+            raise ValueError("Rate reused experiment inputs on their original run, not again")
         spec = next(s for s in run["plan"]["steps"] if s["id"] == step_id)
         with self.connect() as db:
             db.execute('''INSERT INTO feedback VALUES(?,?,?,?,?,?)

@@ -44,6 +44,7 @@ def delivery(engine, run_id):
                 write(name, raw)
                 entries.append({"name": name, "sha256": hashlib.sha256(raw).hexdigest(), "bytes": len(raw)})
         manifest = {"schema": 1, "generator": "Creator Loom", "format": run["brief"]["format"],
-                    "language": run["brief"]["language"], "files": entries}
+                    "language": run["brief"]["language"], "files": entries,
+                    "isolated_task": run["plan"].get("isolated_task")}
         write("manifest.json", json.dumps(manifest, ensure_ascii=False, indent=2))
     return buffer.getvalue()

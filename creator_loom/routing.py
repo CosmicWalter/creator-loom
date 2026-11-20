@@ -83,7 +83,7 @@ def allocate(cards, store, brief, requests):
     Exhaustive search gives a reproducible optimum under those estimates, not
     a claim that self-reported model priors predict actual creative quality.
     """
-    decisions = [choose(cards, store, profile=brief.profile, capability=r["capability"],
+    decisions = [choose([c for c in cards if not r.get("models") or c.id in r["models"]], store, profile=brief.profile, capability=r["capability"],
                         language=brief.language,
                         chars=0 if r["capability"] == "audio" and r.get("text_inputs") else r["chars"],
                         budget=brief.budget,

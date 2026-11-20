@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.0
+
+- Add CLI task-isolated model comparisons with frozen plans, preassigned development/holdout briefs and randomized A/B presentation. Candidate targets reuse the baseline's exact upstream artifacts.
+- Lock holdout generation until immutable development reviews are sealed. Protect ordinary execution and feedback paths from bypassing the benchmark protocol.
+- Export minimal reviewer packets with shared creative inputs, excluding model/run mappings and operational sidecars. Local owners can still inspect mappings; generated content may reveal identity.
+- Report separate partition outcomes and descriptive sign-test results. Explicit calibration uses only approved, hash-verified holdout artifacts and task/backend-scoped quality feedback.
+- Add synthetic protocol tests. No live-provider quality evidence, independent reviewer validation or equal-spend comparison is claimed.
+
 ## 0.7.0
 
 - Add a dependency-free, authenticated loopback workbench for creation, archives, books/series, research review and creator practice. It reads actual persisted state, without fabricated dashboard metrics.

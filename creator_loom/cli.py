@@ -7,6 +7,7 @@ import sys
 import time
 from pathlib import Path
 
+from .benchmarks import Benchmarks
 from .domain import Brief, RECIPES, identifier
 from .coaching import Coach
 from .engine import Engine
@@ -166,6 +167,21 @@ def main(argv=None):
         if command == "research-propose":
             p.add_argument("technique")
             p.add_argument("--guidance", required=True)
+    p = sub.add_parser("benchmark-new")
+    p.add_argument("id")
+    p.add_argument("--spec", type=Path, required=True)
+    for command in ["benchmark-inspect", "benchmark-seal", "benchmark-report", "benchmark-calibrate"]:
+        sub.add_parser(command).add_argument("id")
+    for command in ["benchmark-generate", "benchmark-packet", "benchmark-review"]:
+        p = sub.add_parser(command)
+        p.add_argument("id")
+        p.add_argument("case")
+        if command == "benchmark-generate":
+            p.add_argument("arm", choices=["baseline", "candidate"])
+        elif command == "benchmark-review":
+            p.add_argument("--a", type=float, required=True)
+            p.add_argument("--b", type=float, required=True)
+            p.add_argument("--rationale", required=True)
     args = parser.parse_args(argv)
     try:
         store = Store(args.data)
@@ -176,7 +192,21 @@ def main(argv=None):
         library = Library(store)
         series = Series(store, engine)
         research = Research(store, learning)
-        if args.command == "serve":
+        if args.command.startswith("benchmark-"):
+            benchmarks = Benchmarks(store, cards)
+            action = args.command.removeprefix("benchmark-")
+            if action == "new":
+                emit(benchmarks.create(args.id, json.loads(args.spec.read_text())))
+            elif action == "generate":
+                emit(benchmarks.generate(args.id, args.case, args.arm))
+            elif action == "packet":
+                emit(benchmarks.write_packet(args.id, args.case))
+            elif action == "review":
+                emit(benchmarks.review(args.id, args.case, {"A": args.a, "B": args.b}, args.rationale))
+            else:
+                method = {"inspect": "inspect", "seal": "seal_development", "report": "report", "calibrate": "calibrate"}[action]
+                emit(getattr(benchmarks, method)(args.id))
+        elif args.command == "serve":
             from .workbench import create_server
             if not 0 <= args.port <= 65535:
                 raise ValueError("Invalid port")
