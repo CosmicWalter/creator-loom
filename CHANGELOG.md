@@ -7,7 +7,7 @@
 - Capture allowlisted provider-reported chat token counts; expose configured-rate cost estimates and unpriced coverage through `metrics`. Missing usage remains unknown.
 - Reserve enforced upstream output character bounds against downstream input limits during joint allocation. Configure speech voice and output token limits in model cards.
 - Remove measurements from future decision inputs when forgetting a profile, while documenting retained artifact/audit history.
-- Update CI to verified, pinned v6 action revisions.
+- Update CI to official v6 action tags.
 
 ## 0.2.0
 
