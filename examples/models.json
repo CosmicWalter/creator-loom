@@ -1,0 +1,57 @@
+{
+  "models": [
+    {
+      "id": "local-writer",
+      "capability": "text",
+      "adapter": "chat",
+      "model": "replace-with-installed-model",
+      "endpoint": "http://127.0.0.1:8000/v1",
+      "local": true,
+      "quality": 0.65,
+      "cost": 0,
+      "latency": 30,
+      "max_chars": 30000,
+      "languages": ["zh", "en"],
+      "enabled": false
+    },
+    {
+      "id": "cloud-writer",
+      "capability": "text",
+      "adapter": "chat",
+      "model": "replace-with-provider-model",
+      "endpoint": "https://api.example.com/v1",
+      "api_key_env": "LOOM_WRITER_KEY",
+      "quality": 0.8,
+      "cost": 0.03,
+      "latency": 15,
+      "max_chars": 30000,
+      "enabled": false
+    },
+    {
+      "id": "speech-provider",
+      "capability": "audio",
+      "adapter": "speech",
+      "model": "replace-with-speech-model",
+      "endpoint": "https://api.example.com/v1",
+      "api_key_env": "LOOM_SPEECH_KEY",
+      "quality": 0.7,
+      "cost": 0.05,
+      "latency": 30,
+      "max_chars": 10000,
+      "enabled": false
+    },
+    {
+      "id": "image-provider",
+      "capability": "image",
+      "adapter": "image",
+      "model": "replace-with-image-model",
+      "endpoint": "https://api.example.com/v1",
+      "api_key_env": "LOOM_IMAGE_KEY",
+      "quality": 0.8,
+      "cost": 0.1,
+      "latency": 60,
+      "max_chars": 16000,
+      "enabled": false
+    }
+  ]
+}
