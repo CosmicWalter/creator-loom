@@ -49,6 +49,8 @@ def choose(cards, store, *, profile, capability, language, chars, budget, local_
             reasons.append("language unsupported")
         if card.api_key_env and not os.environ.get(card.api_key_env):
             reasons.append("credential environment variable missing")
+        if card.adapter == "mediaflow" and not card.voice_authorized:
+            reasons.append("reference voice authorization not declared")
         if card.adapter == "render" and (not shutil.which("ffmpeg") or not shutil.which("ffprobe")):
             reasons.append("ffmpeg or ffprobe not installed")
         if reasons:
@@ -97,7 +99,7 @@ def allocate(cards, store, brief, requests):
         reservations = []
         for card, request in zip(selected, requests):
             upstream = request.get("text_inputs", [])
-            if card.adapter == "speech" and upstream:
+            if card.adapter in {"speech", "mediaflow"} and upstream:
                 chars = selected[upstream[0]["index"]].max_output_chars
             else:
                 chars = request["chars"] + sum(selected[d["index"]].max_output_chars + d["header_chars"] for d in upstream)

@@ -44,10 +44,29 @@ loom --config config.local.json execute RUN_ID
 | `chat` | `/chat/completions` → Markdown | 非流式，默认 2048 输出 token / 9000 字符；两项可配置 |
 | `image` | `/images/generations` → base64 PNG | 单张 1024×1024；不自动下载返回 URL |
 | `speech` | `/audio/speech` → PCM WAV | `voice` 可配置，默认 `alloy`；不包含声音克隆 |
+| `mediaflow` | 本机 MediaFlow 任务 API → 分段 PCM WAV + 时间段 JSON | IndexTTS、已授权参考音色；记录任务号，支持暂停与恢复 |
 | `cover` | 本地图形 → SVG + PPM | 模板设计，不是生成式模型 |
 | `render` | 图片 + 旁白 → H.264/AAC MP4 | 系统需安装 FFmpeg/FFprobe；静态配图视频，旁白超过 10 分钟会拒绝而非截断 |
 
 本地 HTTP 模型只能使用 loopback；远端接口要求 HTTPS，拒绝 URL 内凭据和重定向。`--local-only` 禁止向远端模型发内容，但无法证明 loopback 服务内部没有再调用云服务。
+
+## 接入本机 MediaFlow 配音
+
+如已安装并启动独立的 MediaFlow 服务，可上传已授权参考音色，然后把返回的素材 ID 填入示例模型卡的 `voice`，确认 `voice_authorized: true` 并启用该卡：
+
+```sh
+loom mediaflow-upload-voice reference.wav --voice-authorized
+loom --config config.local.json create '一段原创故事' --format podcast --local-only
+loom --config config.local.json execute RUN_ID
+# waiting_external 表示远端任务尚未交付；已完成文稿不会重做。
+loom resume RUN_ID
+loom wait RUN_ID --timeout 300
+loom remote-ops RUN_ID
+```
+
+旁白按模型卡的 `segment_chars` 分段，默认每段最多 150 字；每段保留冻结请求、幂等键、远端任务号和音频摘要。已知任务恢复时查询原任务，下载失败只重试可重复读取的 MediaFlow 文件。提交响应不明时停止重发，需显式核对并绑定已有任务号。音频拼接后可继续原来的配图视频步骤。
+
+`timings.json` 是按每段实际音频长度生成的时间范围，不是逐字对齐。MediaFlow 仍是独立可选服务，此仓库不包含其代码、模型权重或已有账号。授权、异步状态、核对命令和验收边界见 [MediaFlow 接入](docs/mediaflow.md)。
 
 ## 创作流程
 
@@ -108,7 +127,7 @@ loom feedback RUN_ID draft 0.8
 loom forget default
 ```
 
-`forget` 删除偏好、用于路由的反馈与调用指标，阻止这些历史继续影响选择；不删除研究订阅与资料、导入书籍、系列连续性笔记、作品、作品内保存的指标、评测或审计日志。当前 profile 是本机偏好分组，不是隔离租户或认证账号。
+`forget` 删除偏好、用于路由的反馈与调用指标，阻止这些历史继续影响选择；不删除远端任务凭据、研究订阅与资料、导入书籍、系列连续性笔记、作品、作品内保存的指标、评测或审计日志。当前 profile 是本机偏好分组，不是隔离租户或认证账号。
 
 ## 创作者练习
 
@@ -168,7 +187,7 @@ loom rollback concrete-detail
 
 ## 可靠性与验证
 
-远端调用开始前保存状态；超时、进程中断、响应解析失败等都可能已经产生费用，因此结果不明的运行不能自动重放。失败时保留已完成步骤和事件，以便核对供应商。暂不提供跨进程断点恢复的完整协调器。
+远端调用开始前保存状态；超时、进程中断、响应解析失败等都可能已经产生费用，因此结果不明的运行不能自动重放。失败时保留已完成步骤和事件，以便核对供应商。MediaFlow 配音可在进程锁确认没有本端执行器后，从已记录的异步检查点恢复；未知的同步模型调用仍不能自动重放。这不是适用于任意提供商的完整恢复协调器。
 
 审核绑定所有产物的 SHA256；产物被修改后拒绝审核。密钥、原项目账号、私有素材和部署配置不迁入仓库。单用户本机工具，不应当直接当作公网多租户服务。
 

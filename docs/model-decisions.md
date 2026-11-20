@@ -33,6 +33,8 @@ For speech models, `voice` is the provider's voice identifier, defaulting to `al
 
 The unit of learning is `(profile, format:stage, backend signature)`. The signature binds model ID, adapter, capability, endpoint, model name, local designation, speech voice and output token/character settings. It excludes editable quality, cost and latency priors so recalibration does not erase history. A provider can still change the implementation behind a stable model name; pin versions when available.
 
+MediaFlow signatures additionally bind reference-voice authorization, reference transcript and segment length. Completed MediaFlow steps report end-to-end wall time from segment reservation to assembled output, including queue/polling/operator delays; it is not isolated model inference latency. Pending checkpoints do not count as completed measurement rows. Poll promptly or use the foreground `wait` command when calibrating latency, and do not compare these samples to inference-only benchmarks.
+
 With `n` user ratings, posterior quality is `(4 × prior + sum(ratings)) / (4 + n)`. Updating one artifact's rating replaces the prior rating rather than adding another sample. Feedback for an article does not modify novel-stage estimates. Prior-version feedback can be read from its frozen run metadata without rewriting old records.
 
 Execution reliability is `(4 + successful_attempts) / (4 + recorded_attempts)`. Failed or uncertain attempts count against reliability; preflight failures before adapter execution do not. It measures delivery mechanics, not artistic quality. Delays after submission cannot safely be interpreted as no charge.

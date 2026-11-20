@@ -16,6 +16,7 @@ from .store import Store
 from .library import Library
 from .series import Series
 from .research import Research
+from .mediaflow import Client as MediaFlowClient, MediaFlow
 
 
 def emit(value):
@@ -49,7 +50,7 @@ def main(argv=None):
         p.add_argument("--book", help="Explicitly authorized imported book ID")
         p.add_argument("--unit", type=int, default=0)
         p.add_argument("--continuity", default="")
-    for command in ["execute", "inspect", "approve"]:
+    for command in ["execute", "inspect", "approve", "resume", "remote-ops"]:
         sub.add_parser(command).add_argument("run")
     p = sub.add_parser("feedback")
     p.add_argument("run")
@@ -138,6 +139,19 @@ def main(argv=None):
     p = sub.add_parser("research-worker")
     p.add_argument("--watch", action="store_true", help="Run foreground due-source polling until interrupted")
     p.add_argument("--poll-seconds", type=int, default=60)
+    p = sub.add_parser("wait")
+    p.add_argument("run")
+    p.add_argument("--timeout", type=int, default=60)
+    p.add_argument("--interval", type=int, default=2)
+    p = sub.add_parser("mediaflow-upload-voice")
+    p.add_argument("file", type=Path)
+    p.add_argument("--endpoint", default="http://127.0.0.1:18120")
+    p.add_argument("--voice-authorized", action="store_true")
+    p = sub.add_parser("mediaflow-reconcile")
+    p.add_argument("run")
+    p.add_argument("step")
+    p.add_argument("segment", type=int)
+    p.add_argument("job")
     p = sub.add_parser("research-inbox")
     p.add_argument("--state", choices=["inbox", "dismissed", "proposed", "changed", "all"], default="inbox")
     sub.add_parser("research-show").add_argument("item")
@@ -171,6 +185,32 @@ def main(argv=None):
                       "next": "Inspect the plan, then explicitly execute the run"})
         elif args.command == "execute":
             emit(engine.execute(args.run))
+        elif args.command == "resume":
+            emit(engine.resume(args.run))
+        elif args.command == "remote-ops":
+            store.run(args.run)
+            with store.connect() as db:
+                emit([{ "step": r["step_id"], "batch": json.loads(r["payload"])}
+                      for r in db.execute("SELECT * FROM remote_batches WHERE run_id=?", (args.run,))])
+        elif args.command == "wait":
+            if not 1 <= args.timeout <= 3600 or not 1 <= args.interval <= 30:
+                raise ValueError("Wait timeout must be 1–3600s and interval 1–30s")
+            deadline = time.monotonic()+args.timeout
+            result = store.run(args.run)
+            while result["status"] in {"waiting_external", "executing"}:
+                result = engine.resume(args.run)
+                if result["status"] != "waiting_external" or result.get("waiting_reason") == "reconciliation_required":
+                    break
+                remaining = deadline-time.monotonic()
+                if remaining <= 0:
+                    result["wait_timed_out"] = True
+                    break
+                time.sleep(min(args.interval, remaining))
+            emit(result)
+        elif args.command == "mediaflow-upload-voice":
+            emit(MediaFlowClient(args.endpoint).upload_voice(args.file, args.voice_authorized))
+        elif args.command == "mediaflow-reconcile":
+            emit(engine.reconcile_mediaflow(args.run, args.step, args.segment, args.job))
         elif args.command == "inspect":
             emit(store.run(args.run))
         elif args.command == "approve":
@@ -191,7 +231,7 @@ def main(argv=None):
             identifier(args.profile)
             store.forget(args.profile)
             emit({"status": "preferences_routing_feedback_and_measurements_deleted",
-                  "retained": "research subscriptions/evidence, books, series continuity, creative runs, artifacts (including embedded metrics), practice, evaluations and audit events"})
+                  "retained": "remote operation receipts, research subscriptions/evidence, books, series continuity, creative runs, artifacts (including embedded metrics), practice, evaluations and audit events"})
         elif args.command == "models":
             emit([m.to_dict() for m in cards])
         elif args.command == "discover":

@@ -79,6 +79,9 @@ class Store:
                 CREATE TABLE IF NOT EXISTS feed_runs (
                   id TEXT PRIMARY KEY, subscription_id TEXT NOT NULL, outcome TEXT NOT NULL,
                   report TEXT NOT NULL, checked REAL NOT NULL);
+                CREATE TABLE IF NOT EXISTS remote_batches (
+                  run_id TEXT NOT NULL, step_id TEXT NOT NULL, payload TEXT NOT NULL,
+                  PRIMARY KEY(run_id,step_id));
             ''')
             db.execute("BEGIN IMMEDIATE")
             if "transport" not in {r[1] for r in db.execute("PRAGMA table_info(subscriptions)")}:

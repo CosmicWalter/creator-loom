@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.0
+
+- Add optional local MediaFlow narration with explicit reference-voice authorization, bounded uploads, segmented requests, durable task IDs and validated PCM assembly/timings.
+- Persist submission intent before POST; unknown receipts require explicit binding to a matching existing job, never automatic resubmission. Known tasks use safe status/file GETs.
+- Add process-lifetime execution locks, selective MediaFlow resume, bounded foreground waiting and recovery of fully saved completion checkpoints. Completed upstream work is verified and reused.
+- Preserve asynchronous receipts during personalization resets and require explicit provider checks before rejecting externally waiting series attempts.
+- Add real HTTP fault tests and a reusable isolated real-MediaFlow/real-FFmpeg validation script with simulated inference.
+
 ## 0.5.0
 
 - Persist public RSS/Atom subscriptions, polling intervals, source versions and short fetch leases; collect due sources once or through an explicitly started foreground worker.

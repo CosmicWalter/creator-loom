@@ -50,7 +50,7 @@ loom series-reject SERIES_ID RUN_ID --base-version VERSION \
 
 Rejection retains the same source unit and continuity, clears the pending reservation and increments the version. An unexecuted plan is cancelled so it cannot later be executed accidentally. Completed evidence is retained with the rejection reason. A subsequent explicit `series-next` creates a new attempt, which may incur new costs; there is no automatic retry.
 
-An uncertain remote operation requires `--provider-checked` in addition to a reason. Use this only after reconciling the provider-side outcome and deciding that another attempt is appropriate. The declaration is an operator assertion, not automated reconciliation. The old uncertain run remains uncertain in history. An executing run cannot be detached, even with this flag; a live/crashed-worker recovery coordinator is not implemented yet.
+An uncertain or externally waiting operation requires `--provider-checked` in addition to a reason. Use this only after reconciling the provider-side outcome and deciding that another attempt is appropriate. The declaration is an operator assertion, not automated reconciliation. The old run and remote receipts remain in history. An executing run cannot be detached, even with this flag. MediaFlow checkpoints can be resumed after obtaining the process-lifetime execution lock; unknown synchronous operations still require manual handling.
 
 `series-inspect` shows cursor, version, pending run and accepted/rejected attempts. Source books and series notes are retained by `forget`; it only resets personalization/decision inputs. Back up the database, `library/` and `outputs/` together before manual migration or data removal.
 

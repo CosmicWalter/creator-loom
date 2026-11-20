@@ -44,12 +44,15 @@ class ModelCard:
     voice: str = "alloy"
     input_price_per_million: float | None = None
     output_price_per_million: float | None = None
+    voice_authorized: bool = False
+    voice_prompt: str = ""
+    segment_chars: int = 150
 
     def __post_init__(self):
         identifier(self.id)
         if self.capability not in {"text", "image", "audio", "video"}:
             raise ValueError("Unknown capability")
-        adapters = {"chat": "text", "image": "image", "speech": "audio",
+        adapters = {"chat": "text", "image": "image", "speech": "audio", "mediaflow": "audio",
                     "cover": "image", "render": "video"}
         if adapters.get(self.adapter) != self.capability:
             raise ValueError("Adapter does not implement this capability")
@@ -69,6 +72,10 @@ class ModelCard:
             raise ValueError("max_output_chars must be 1–1000000")
         if not isinstance(self.voice, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", self.voice):
             raise ValueError("voice must be a provider voice ID")
+        if not isinstance(self.voice_authorized, bool) or not isinstance(self.voice_prompt, str) or len(self.voice_prompt) > 1000:
+            raise ValueError("Voice authorization must be a boolean and reference text at most 1000 characters")
+        if type(self.segment_chars) is not int or not 20 <= self.segment_chars <= 500:
+            raise ValueError("segment_chars must be 20–500")
         for value in [self.input_price_per_million, self.output_price_per_million]:
             if value is not None:
                 bounded(value, 0, 100000, "token price")
@@ -82,7 +89,7 @@ class ModelCard:
             raise ValueError("Invalid max_chars")
         if not self.languages or any(not isinstance(x, str) for x in self.languages):
             raise ValueError("languages must be a nonempty list of strings")
-        if self.adapter in {"chat", "image", "speech"}:
+        if self.adapter in {"chat", "image", "speech", "mediaflow"}:
             u = urlsplit(self.endpoint)
             loopback = u.hostname in {"localhost", "127.0.0.1", "::1"}
             if u.username or u.password or u.query or u.fragment:
@@ -95,6 +102,13 @@ class ModelCard:
                 raise ValueError("Remote adapters require a model name")
             if self.api_key_env and not re.fullmatch(r"[A-Z][A-Z0-9_]*", self.api_key_env):
                 raise ValueError("api_key_env must name an environment variable")
+            if self.adapter == "mediaflow":
+                if not self.local or not loopback or u.path not in {"", "/"} or self.api_key_env:
+                    raise ValueError("MediaFlow requires a loopback root endpoint, local=true, and no credential environment variable")
+                if self.model != "indextts" or not re.fullmatch(r"[a-f0-9]{32}", self.voice):
+                    raise ValueError("MediaFlow requires model=indextts and an uploaded voice asset ID")
+                if self.max_chars > 15000:
+                    raise ValueError("MediaFlow narration is limited to 15000 input characters")
         elif not self.local or self.cost != 0:
             raise ValueError("Built-in local tools must be local and zero-cost")
 
@@ -106,6 +120,8 @@ class ModelCard:
         # the backend or generation settings must not inherit another model's scores.
         identity = {k: getattr(self, k) for k in
                     ["id", "capability", "adapter", "model", "endpoint", "local", "voice", "max_output_tokens", "max_output_chars"]}
+        if self.adapter == "mediaflow":
+            identity.update({k: getattr(self, k) for k in ["voice_authorized", "voice_prompt", "segment_chars"]})
         return hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
 
 

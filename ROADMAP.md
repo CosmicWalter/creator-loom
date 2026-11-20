@@ -22,7 +22,8 @@ This is a delivery backlog, not a promise that the complete product is already a
 - [x] Reserve upstream output bounds against downstream input capacity in joint allocation.
 - [ ] Calibrate model priors and quality dimensions using reviewed real-provider creative tasks and actual billing evidence.
 - [ ] Voice selection/authorization, subtitle timings, dynamic covers, clips and audio mixing.
-- [ ] ComfyUI and MediaFlow adapters with persistent remote IDs and safe polling recovery.
+- [x] MediaFlow narration adapter with frozen segment requests, persistent remote IDs, safe polling/download recovery and explicit reconciliation.
+- [ ] ComfyUI adapter, MediaFlow transcription delivery and additional asynchronous model providers.
 - [x] Bounded TXT/unencrypted EPUB import, chapter/unit provenance and reviewed sequential creation with frozen continuity notes.
 - [ ] Rich character memory, automatic continuity proposals, editable timeline and shot-level review.
 - [ ] Local creation workbench, asset library and structured preview/export.

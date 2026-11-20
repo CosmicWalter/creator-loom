@@ -115,7 +115,7 @@ class Series:
         run = self.store.run(run_id)
         if run["status"] == "executing":
             raise ValueError("Cannot detach a running episode; reconcile its worker first")
-        if any(s["status"] in {"running", "uncertain"} for s in run["steps"]) and not provider_checked:
+        if any(s["status"] in {"running", "uncertain", "waiting_external"} for s in run["steps"]) and not provider_checked:
             raise ValueError("Unknown remote effects require explicit provider reconciliation (--provider-checked)")
         with self.store.connect() as db:
             db.execute("BEGIN IMMEDIATE")

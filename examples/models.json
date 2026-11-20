@@ -48,6 +48,23 @@
       "enabled": false
     },
     {
+      "id": "mediaflow-local",
+      "capability": "audio",
+      "adapter": "mediaflow",
+      "model": "indextts",
+      "endpoint": "http://127.0.0.1:18120",
+      "local": true,
+      "voice": "00000000000000000000000000000000",
+      "voice_authorized": false,
+      "voice_prompt": "",
+      "segment_chars": 150,
+      "quality": 0.6,
+      "cost": 0,
+      "latency": 60,
+      "max_chars": 12000,
+      "enabled": false
+    },
+    {
       "id": "image-provider",
       "capability": "image",
       "adapter": "image",

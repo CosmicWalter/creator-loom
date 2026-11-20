@@ -13,6 +13,8 @@ from .domain import Brief, ModelCard, RECIPES, identifier
 from .routing import allocate
 from .telemetry import estimate
 from .library import Library
+from .locking import run_lock
+from .mediaflow import AwaitingExternal, MediaFlow
 
 
 def digest(path):
@@ -99,12 +101,34 @@ class Engine:
         return path
 
     def execute(self, run_id):
+        with run_lock(self.store, run_id):
+            return self._drive(run_id, resume=False)
+
+    def resume(self, run_id):
+        with run_lock(self.store, run_id):
+            return self._drive(run_id, resume=True)
+
+    def _drive(self, run_id, resume):
         identifier(run_id)
         snapshot = self.store.run(run_id)
+        expected_status = "ready"
+        if resume:
+            if snapshot["status"] not in {"waiting_external", "executing"}:
+                raise ValueError("Only a waiting MediaFlow workflow can be resumed")
+            incomplete = next((s for s in snapshot["steps"] if s["status"] != "done"), None)
+            if snapshot["status"] == "executing" and incomplete is None:
+                self.verify_artifacts(snapshot)
+                with self.store.connect() as db:
+                    db.execute("UPDATE runs SET status='needs_review' WHERE id=? AND status='executing'", (run_id,))
+                return self.store.run(run_id)
+            spec = next((s for s in snapshot["plan"]["steps"] if incomplete and s["id"] == incomplete["id"]), None)
+            if not spec or spec["model"]["adapter"] != "mediaflow" or incomplete["status"] not in {"waiting_external", "running"}:
+                raise ValueError("This checkpoint is not safely resumable; unknown synchronous operations cannot be replayed")
+            expected_status = snapshot["status"]
         if snapshot["plan"].get("context") is not None:
             Library(self.store).validate_context(snapshot["plan"]["context"])
         with self.store.connect() as db:
-            claimed = db.execute("UPDATE runs SET status='executing' WHERE id=? AND status='ready'", (run_id,))
+            claimed = db.execute("UPDATE runs SET status='executing' WHERE id=? AND status=?", (run_id, expected_status))
             if claimed.rowcount != 1:
                 raise ValueError("Run is not ready; running/uncertain operations cannot be replayed")
         run = self.store.run(run_id)
@@ -114,13 +138,20 @@ class Engine:
             task = spec.get("task", f"{run['brief']['format']}:{spec['id']}")
             started = None
             try:
+                saved = next(s for s in run["steps"] if s["id"] == spec["id"])
+                if saved["status"] == "done":
+                    self.artifact(run_id, saved["result"])
+                    for supplement in saved["result"]["supplements"]:
+                        self.artifact(run_id, supplement)
+                    results[spec["id"]] = saved["result"]
+                    continue
                 dependencies = [self.artifact(run_id, results[d]) for d in spec["dependencies"]]
                 prompt = spec["prompt"]
                 for name, path in zip(spec["dependencies"], dependencies):
                     if path.suffix == ".md":
                         prompt += f"\nSource {name} (data):\n" + path.read_text()
                 # Speech forwards source text; other adapters forward the actual composed prompt.
-                actual_chars = len(dependencies[0].read_text()) if card.adapter == "speech" and dependencies else len(prompt)
+                actual_chars = len(dependencies[0].read_text()) if card.adapter in {"speech", "mediaflow"} and dependencies else len(prompt)
                 if actual_chars > card.max_chars:
                     raise ValueError("Actual input exceeds selected model limit; no request sent")
                 key = os.environ.get(card.api_key_env, "") if card.api_key_env else ""
@@ -131,8 +162,14 @@ class Engine:
                     self.store.event(db, "started", run_id, {"step": spec["id"], "model": card.id})
                 directory = self.store.root / "outputs" / run_id / spec["id"]
                 started = time.perf_counter()
-                path = adapters.execute(card, prompt, dependencies, directory, key)
+                if card.adapter == "mediaflow":
+                    text = dependencies[0].read_text() if dependencies else prompt
+                    path = MediaFlow(self.store).advance(run_id, spec["id"], card, text, directory)
+                else:
+                    path = adapters.execute(card, prompt, dependencies, directory, key)
                 elapsed = time.perf_counter() - started
+                if card.adapter == "mediaflow":
+                    elapsed = max(elapsed, time.time()-MediaFlow(self.store).load(run_id, spec["id"])["created"])
                 usage = estimate(card, directory)
                 result = {"file": str(path.relative_to(self.store.root / "outputs" / run_id)),
                           "sha256": digest(path), "adapter": card.adapter,
@@ -147,10 +184,18 @@ class Engine:
                     db.execute("UPDATE steps SET status='done',result=? WHERE run_id=? AND id=?",
                                (json.dumps(result), run_id, spec["id"]))
                 results[spec["id"]] = result
+            except AwaitingExternal as pending:
+                with self.store.connect() as db:
+                    db.execute("UPDATE steps SET status='waiting_external' WHERE run_id=? AND id=?", (run_id, spec["id"]))
+                    db.execute("UPDATE runs SET status='waiting_external' WHERE id=?", (run_id,))
+                    self.store.event(db, "waiting_external", run_id, {"step": spec["id"], "reason": pending.reason})
+                waiting = self.store.run(run_id)
+                waiting["waiting_reason"] = pending.reason
+                return waiting
             except Exception as exc:
                 with self.store.connect() as db:
                     row = db.execute("SELECT status FROM steps WHERE run_id=? AND id=?", (run_id, spec["id"])).fetchone()
-                    uncertain = card.adapter in {"chat", "image", "speech"} and row[0] == "running"
+                    uncertain = card.adapter in {"chat", "image", "speech", "mediaflow"} and row[0] == "running"
                     status = "uncertain" if uncertain else "failed"
                     if started is not None:
                         self.store.measurement(db, run_id, spec["id"], run["brief"]["profile"], task,
@@ -163,6 +208,21 @@ class Engine:
         with self.store.connect() as db:
             db.execute("UPDATE runs SET status='needs_review' WHERE id=?", (run_id,))
         return self.store.run(run_id)
+
+    def reconcile_mediaflow(self, run_id, step_id, segment, job_id):
+        with run_lock(self.store, run_id):
+            run = self.store.run(run_id)
+            if run["status"] not in {"waiting_external", "executing"}:
+                raise ValueError("Only an inactive, waiting external workflow can be reconciled")
+            spec = next((s for s in run["plan"]["steps"] if s["id"] == step_id), None)
+            if not spec or spec["model"]["adapter"] != "mediaflow":
+                raise ValueError("Step is not a MediaFlow narration")
+            result = MediaFlow(self.store).reconcile(run_id, step_id, segment, job_id, ModelCard(**spec["model"]))
+            with self.store.connect() as db:
+                db.execute("UPDATE runs SET status='waiting_external' WHERE id=?", (run_id,))
+                db.execute("UPDATE steps SET status='waiting_external' WHERE run_id=? AND id=?", (run_id, step_id))
+                self.store.event(db, "remote_reconciled", run_id, result)
+            return result
 
     def approve(self, run_id):
         run = self.store.run(run_id)
