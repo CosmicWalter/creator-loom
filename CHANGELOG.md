@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.0
+
+- Route by format/stage quality priors, isolated feedback and backend/generation signatures. A novel outline and chapter can select different specialists.
+- Record actual adapter wall time and outcomes. Use task-specific successful runtime observations and smoothed execution reliability in future plans.
+- Capture allowlisted provider-reported chat token counts; expose configured-rate cost estimates and unpriced coverage through `metrics`. Missing usage remains unknown.
+- Reserve enforced upstream output character bounds against downstream input limits during joint allocation. Configure speech voice and output token limits in model cards.
+- Remove measurements from future decision inputs when forgetting a profile, while documenting retained artifact/audit history.
+- Update CI to verified, pinned v6 action revisions.
+
 ## 0.2.0
 
 - Allocate models jointly across workflow steps under total configured cost and latency estimates. Save search method and feasible combination counts.

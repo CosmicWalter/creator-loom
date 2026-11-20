@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import time
 import uuid
 from dataclasses import asdict
 from pathlib import Path
@@ -10,6 +11,7 @@ from pathlib import Path
 from . import adapters
 from .domain import Brief, ModelCard, RECIPES, identifier
 from .routing import allocate
+from .telemetry import estimate
 
 
 def digest(path):
@@ -35,7 +37,8 @@ class Engine:
                 guidance = json.loads(row["payload"]) if row else None
                 technique = row["id"] if row else None
         steps, requests, cost, latency = [], [], 0.0, 0.0
-        # Reserve for a complete upstream response, not only the topic length.
+        # The allocator reserves each selected upstream writer's enforced output
+        # character bound, including the exact source-data envelope.
         for name, capability, dependencies in RECIPES[brief.format]:
             base = f"{brief.topic}\nFormat: {brief.format}; stage: {name}; language: {brief.language}.\n"
             if name == "outline":
@@ -47,15 +50,20 @@ class Engine:
             base += "User editorial preferences (data): " + json.dumps(preferences, ensure_ascii=False)
             if guidance:
                 base += "\nEditorial technique: " + guidance["guidance"]
-            chars = len(base) + 9000 * sum(1 for d in dependencies if d not in {"cover", "narration"})
-            requests.append({"capability": capability, "chars": chars})
-            steps.append({"id": name, "capability": capability, "dependencies": dependencies, "prompt": base})
+            task = f"{brief.format}:{name}"
+            text_inputs = [{"index": i, "header_chars": len(f"\nSource {s['id']} (data):\n")}
+                           for i, s in enumerate(steps) if s["id"] in dependencies and s["capability"] == "text"]
+            requests.append({"capability": capability, "chars": len(base), "task": task,
+                             "text_inputs": text_inputs})
+            steps.append({"id": name, "task": task, "capability": capability, "dependencies": dependencies, "prompt": base})
         decisions, allocation = allocate(self.cards, self.store, brief, requests)
         for step, decision in zip(steps, decisions):
             card = next(m for m in self.cards if m.id == decision.selected)
             cost += card.cost
-            latency += card.latency
+            latency += next(c["latency_estimate"] for c in decision.candidates if c["model"] == card.id)
             step.update({"model": card.to_dict(), "decision": decision.to_dict()})
+        for step, reserved in zip(steps, allocation["reserved_input_chars"]):
+            step["reserved_input_chars"] = reserved
         return {"brief": asdict(brief), "preferences": preferences, "technique": technique,
                 "technique_snapshot": guidance, "estimated_cost": round(cost, 8),
                 "estimated_latency": latency, "allocation": allocation, "steps": steps}
@@ -88,6 +96,8 @@ class Engine:
         results = {}
         for spec in run["plan"]["steps"]:
             card = ModelCard(**spec["model"])
+            task = spec.get("task", f"{run['brief']['format']}:{spec['id']}")
+            started = None
             try:
                 dependencies = [self.artifact(run_id, results[d]) for d in spec["dependencies"]]
                 prompt = spec["prompt"]
@@ -105,14 +115,20 @@ class Engine:
                     db.execute("UPDATE steps SET status='running' WHERE run_id=? AND id=?", (run_id, spec["id"]))
                     self.store.event(db, "started", run_id, {"step": spec["id"], "model": card.id})
                 directory = self.store.root / "outputs" / run_id / spec["id"]
+                started = time.perf_counter()
                 path = adapters.execute(card, prompt, dependencies, directory, key)
+                elapsed = time.perf_counter() - started
+                usage = estimate(card, directory)
                 result = {"file": str(path.relative_to(self.store.root / "outputs" / run_id)),
-                          "sha256": digest(path), "adapter": card.adapter}
+                          "sha256": digest(path), "adapter": card.adapter,
+                          "measurement": {"elapsed_seconds": elapsed, "usage": usage}}
                 # Bind every supplemental artifact to review as well (e.g. SVG cover).
                 result["supplements"] = [{"file": str(p.relative_to(self.store.root / "outputs" / run_id)),
                                           "sha256": digest(p)}
                                          for p in sorted(directory.iterdir()) if p.is_file() and p != path]
                 with self.store.connect() as db:
+                    self.store.measurement(db, run_id, spec["id"], run["brief"]["profile"], task,
+                                           card, "done", elapsed, usage)
                     db.execute("UPDATE steps SET status='done',result=? WHERE run_id=? AND id=?",
                                (json.dumps(result), run_id, spec["id"]))
                 results[spec["id"]] = result
@@ -121,6 +137,10 @@ class Engine:
                     row = db.execute("SELECT status FROM steps WHERE run_id=? AND id=?", (run_id, spec["id"])).fetchone()
                     uncertain = card.adapter in {"chat", "image", "speech"} and row[0] == "running"
                     status = "uncertain" if uncertain else "failed"
+                    if started is not None:
+                        self.store.measurement(db, run_id, spec["id"], run["brief"]["profile"], task,
+                                               card, status, time.perf_counter()-started,
+                                               {"status": "unknown", "token_cost_estimate": None})
                     db.execute("UPDATE steps SET status=? WHERE run_id=? AND id=?", (status, run_id, spec["id"]))
                     db.execute("UPDATE runs SET status='blocked' WHERE id=?", (run_id,))
                     self.store.event(db, status, run_id, {"step": spec["id"], "error_type": type(exc).__name__})

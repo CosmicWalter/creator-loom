@@ -17,7 +17,10 @@ This is a delivery backlog, not a promise that the complete product is already a
 ## Real creative delivery
 
 - [ ] Authorize and validate real text/image/speech providers using synthetic licensed briefs.
-- [ ] Measure actual usage and latency; calibrated model priors and quality dimensions.
+- [x] Record adapter wall time, outcomes and provider-reported chat token usage; expose configured-rate cost estimates and missing coverage.
+- [x] Task-specific quality priors, feedback isolation by backend signature, observed reliability and conservative latency.
+- [x] Reserve upstream output bounds against downstream input capacity in joint allocation.
+- [ ] Calibrate model priors and quality dimensions using reviewed real-provider creative tasks and actual billing evidence.
 - [ ] Voice selection/authorization, subtitle timings, dynamic covers, clips and audio mixing.
 - [ ] ComfyUI and MediaFlow adapters with persistent remote IDs and safe polling recovery.
 - [ ] Full book/novel import, chapter/character continuity, editable timeline and shot-level review.

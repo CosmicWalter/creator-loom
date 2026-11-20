@@ -299,7 +299,9 @@ class ProviderContractTest(unittest.TestCase):
                     png += chunk(b"IDAT", zlib.compress(b"\0\x50\x90\xb0")) + chunk(b"IEND", b"")
                     raw = json.dumps({"data": [{"b64_json": base64.b64encode(png).decode()}]}).encode()
                 else:
-                    raw = json.dumps({"choices": [{"message": {"content": "An original ocean story."}}]}).encode()
+                    raw = json.dumps({"choices": [{"message": {"content": "An original ocean story."}}],
+                                      "usage": {"prompt_tokens": 10, "completion_tokens": 5,
+                                                "private_field": "must-not-persist"}}).encode()
                 self.send_response(200)
                 self.send_header("Content-Length", str(len(raw)))
                 self.end_headers()
@@ -320,9 +322,10 @@ class ProviderContractTest(unittest.TestCase):
     def cards(self):
         return load_cards(None) + [
             ModelCard("writer", "text", "chat", model="test-writer", endpoint=self.endpoint,
-                      local=True, api_key_env="LOOM_TEST_KEY", max_chars=30000),
+                      local=True, api_key_env="LOOM_TEST_KEY", max_chars=30000, max_output_tokens=1234,
+                      input_price_per_million=2, output_price_per_million=6),
             ModelCard("speaker", "audio", "speech", model="test-speaker", endpoint=self.endpoint,
-                      local=True, api_key_env="LOOM_TEST_KEY", max_chars=30000)]
+                      local=True, api_key_env="LOOM_TEST_KEY", max_chars=30000, voice="narrator")]
 
     def test_real_http_text_to_audio_contract(self):
         engine = Engine(self.store, self.cards())
@@ -333,6 +336,14 @@ class ProviderContractTest(unittest.TestCase):
         self.assertEqual(self.calls[0][0], "/v1/chat/completions")
         self.assertEqual(self.calls[1][1]["input"], "An original ocean story.")
         self.assertEqual(self.calls[1][2], "Bearer test-only-credential")
+        self.assertEqual(self.calls[0][1]["max_tokens"], 1234)
+        self.assertEqual(self.calls[1][1]["voice"], "narrator")
+        report = self.store.metrics("default", run)
+        self.assertEqual(report["priced_steps"], 1)
+        self.assertEqual(report["unpriced_steps"], 1)
+        self.assertAlmostEqual(report["known_token_cost_estimate"], 0.00005)
+        self.assertGreater(report["steps"][0]["elapsed_seconds"], 0)
+        self.assertNotIn("must-not-persist", (self.store.root / "loom.sqlite3").read_bytes().decode(errors="replace"))
         self.assertNotIn("test-only-credential", (self.store.root / "loom.sqlite3").read_bytes().decode(errors="replace"))
         engine.approve(run)
 

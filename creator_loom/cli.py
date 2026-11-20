@@ -65,6 +65,9 @@ def main(argv=None):
     p.add_argument("--after", type=float, required=True)
     p.add_argument("--rationale", required=True)
     sub.add_parser("progress").add_argument("profile")
+    p = sub.add_parser("metrics")
+    p.add_argument("--profile", default="default")
+    p.add_argument("--run")
     args = parser.parse_args(argv)
     try:
         store = Store(args.data)
@@ -89,7 +92,7 @@ def main(argv=None):
             emit({"status": "approved", "published": False})
         elif args.command == "feedback":
             store.feedback(args.run, args.step, args.rating)
-            emit({"status": "recorded", "scope": "profile and capability"})
+            emit({"status": "recorded", "scope": "profile, format:stage and model signature"})
         elif args.command == "preferences":
             identifier(args.profile)
             if args.set:
@@ -101,8 +104,8 @@ def main(argv=None):
         elif args.command == "forget":
             identifier(args.profile)
             store.forget(args.profile)
-            emit({"status": "preferences_and_routing_feedback_deleted",
-                  "retained": "creative runs, artifacts, practice, evaluations and audit events"})
+            emit({"status": "preferences_routing_feedback_and_measurements_deleted",
+                  "retained": "creative runs, artifacts (including embedded metrics), practice, evaluations and audit events"})
         elif args.command == "models":
             emit([m.to_dict() for m in cards])
         elif args.command == "discover":
@@ -128,6 +131,8 @@ def main(argv=None):
                               args.before, args.after, args.rationale))
         elif args.command == "progress":
             emit(coach.progress(args.profile))
+        elif args.command == "metrics":
+            emit(store.metrics(args.profile, args.run))
         return 0
     except (ValueError, KeyError, TypeError, OSError, sqlite3.Error) as exc:
         # Provider exceptions never expose their bodies; config and local errors remain actionable.

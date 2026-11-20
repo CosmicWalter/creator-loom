@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import math
+import hashlib
+import json
 import re
 from dataclasses import asdict, dataclass, field
 from typing import Any
@@ -36,6 +38,12 @@ class ModelCard:
     max_chars: int = 12000
     languages: tuple[str, ...] = ("*",)
     enabled: bool = True
+    task_quality: dict[str, float] = field(default_factory=dict)
+    max_output_tokens: int = 2048
+    max_output_chars: int = 9000
+    voice: str = "alloy"
+    input_price_per_million: float | None = None
+    output_price_per_million: float | None = None
 
     def __post_init__(self):
         identifier(self.id)
@@ -48,6 +56,26 @@ class ModelCard:
         bounded(self.quality, 0, 1, "quality")
         bounded(self.cost, 0, 100000, "cost")
         bounded(self.latency, 0, 86400, "latency")
+        if not isinstance(self.task_quality, dict):
+            raise ValueError("task_quality must be an object")
+        valid_tasks = set(RECIPES) | {f"{fmt}:{step}" for fmt, recipe in RECIPES.items() for step, _, _ in recipe}
+        for task, quality in self.task_quality.items():
+            if task not in valid_tasks:
+                raise ValueError("task_quality must name a supported format or format:stage")
+            bounded(quality, 0, 1, "task_quality")
+        if type(self.max_output_tokens) is not int or not 1 <= self.max_output_tokens <= 100000:
+            raise ValueError("max_output_tokens must be 1–100000")
+        if type(self.max_output_chars) is not int or not 1 <= self.max_output_chars <= 1000000:
+            raise ValueError("max_output_chars must be 1–1000000")
+        if not isinstance(self.voice, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", self.voice):
+            raise ValueError("voice must be a provider voice ID")
+        for value in [self.input_price_per_million, self.output_price_per_million]:
+            if value is not None:
+                bounded(value, 0, 100000, "token price")
+        if (self.input_price_per_million is None) != (self.output_price_per_million is None):
+            raise ValueError("Configure both input and output token rates, or neither")
+        if self.input_price_per_million is not None and self.adapter != "chat":
+            raise ValueError("Token pricing is currently supported only for chat adapters")
         if not isinstance(self.local, bool) or not isinstance(self.enabled, bool):
             raise ValueError("local and enabled must be booleans")
         if type(self.max_chars) is not int or not 1 <= self.max_chars <= 1000000:
@@ -72,6 +100,13 @@ class ModelCard:
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+    def signature(self) -> str:
+        # Recalibrating priors/prices must not erase experience, but replacing
+        # the backend or generation settings must not inherit another model's scores.
+        identity = {k: getattr(self, k) for k in
+                    ["id", "capability", "adapter", "model", "endpoint", "local", "voice", "max_output_tokens", "max_output_chars"]}
+        return hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
 
 
 @dataclass(frozen=True)

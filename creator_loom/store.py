@@ -38,6 +38,14 @@ class Store:
                   before_score REAL NOT NULL, after_score REAL NOT NULL,
                   rationale TEXT NOT NULL, artifact TEXT NOT NULL,
                   created TEXT DEFAULT CURRENT_TIMESTAMP);
+                CREATE TABLE IF NOT EXISTS measurements (
+                  run_id TEXT NOT NULL, step_id TEXT NOT NULL, profile TEXT NOT NULL,
+                  task TEXT NOT NULL, model TEXT NOT NULL, signature TEXT NOT NULL,
+                  outcome TEXT NOT NULL, elapsed_seconds REAL NOT NULL,
+                  usage TEXT NOT NULL, created TEXT DEFAULT CURRENT_TIMESTAMP,
+                  PRIMARY KEY(run_id,step_id));
+                CREATE INDEX IF NOT EXISTS measurements_scope ON measurements(profile,task,signature);
+                CREATE INDEX IF NOT EXISTS feedback_scope ON feedback(profile,capability,model);
             ''')
 
     @contextmanager
@@ -66,11 +74,50 @@ class Store:
             db.execute("INSERT INTO profiles VALUES(?,?) ON CONFLICT(id) DO UPDATE SET preferences=excluded.preferences",
                        (profile, json.dumps(values, ensure_ascii=False)))
 
-    def observations(self, profile, capability, model):
+    def observations(self, profile, capability, model, task=None, signature=None):
         with self.connect() as db:
-            return [r[0] for r in db.execute(
-                "SELECT rating FROM feedback WHERE profile=? AND capability=? AND model=?",
-                (profile, capability, model))]
+            rows = db.execute('''SELECT f.rating,f.step_id,r.brief,r.plan FROM feedback f
+              JOIN runs r ON r.id=f.run_id WHERE f.profile=? AND f.capability=? AND f.model=?''',
+                              (profile, capability, model)).fetchall()
+        from .domain import ModelCard
+        ratings = []
+        for row in rows:
+            if task is not None and task != f"{json.loads(row['brief'])['format']}:{row['step_id']}":
+                continue
+            if signature is not None:
+                spec = next(s for s in json.loads(row["plan"])["steps"] if s["id"] == row["step_id"])
+                if ModelCard(**spec["model"]).signature() != signature:
+                    continue
+            ratings.append(row["rating"])
+        return ratings
+
+    def performance(self, profile, task, signature):
+        with self.connect() as db:
+            return [dict(r) for r in db.execute(
+                "SELECT outcome,elapsed_seconds FROM measurements WHERE profile=? AND task=? AND signature=?",
+                (profile, task, signature))]
+
+    @staticmethod
+    def measurement(db, run_id, step_id, profile, task, card, outcome, elapsed, usage):
+        db.execute('''INSERT INTO measurements(run_id,step_id,profile,task,model,signature,
+          outcome,elapsed_seconds,usage) VALUES(?,?,?,?,?,?,?,?,?)''',
+                   (run_id, step_id, profile, task, card.id, card.signature(), outcome, elapsed, json.dumps(usage)))
+
+    def metrics(self, profile, run_id=None):
+        from .domain import identifier
+        identifier(profile)
+        with self.connect() as db:
+            sql = "SELECT run_id,step_id,task,model,outcome,elapsed_seconds,usage FROM measurements WHERE profile=?"
+            args = [profile]
+            if run_id:
+                identifier(run_id)
+                sql += " AND run_id=?"
+                args.append(run_id)
+            rows = [{**dict(r), "usage": json.loads(r["usage"])} for r in db.execute(sql, args)]
+        priced = [r["usage"]["token_cost_estimate"] for r in rows if r["usage"].get("token_cost_estimate") is not None]
+        return {"profile": profile, "steps": rows, "priced_steps": len(priced),
+                "unpriced_steps": len(rows)-len(priced), "known_token_cost_estimate": sum(priced),
+                "billing": "Configured token rates only; not provider invoices or complete spending"}
 
     def run(self, run_id):
         with self.connect() as db:
@@ -102,3 +149,4 @@ class Store:
         with self.connect() as db:
             db.execute("DELETE FROM profiles WHERE id=?", (profile,))
             db.execute("DELETE FROM feedback WHERE profile=?", (profile,))
+            db.execute("DELETE FROM measurements WHERE profile=?", (profile,))
