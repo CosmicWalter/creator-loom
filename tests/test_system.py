@@ -24,6 +24,8 @@ from creator_loom.engine import Engine
 from creator_loom.learning import Learning
 from creator_loom.routing import choose, load_cards
 from creator_loom.store import Store
+from creator_loom.library import Library
+from creator_loom.series import Series
 
 
 class SystemTest(unittest.TestCase):
@@ -376,6 +378,35 @@ class ProviderContractTest(unittest.TestCase):
         self.assertEqual((video["width"], video["height"]), (1280, 720))
         self.assertEqual(len(self.calls), 2)
         engine.approve(run)
+
+    @unittest.skipUnless(shutil.which("ffmpeg") and shutil.which("ffprobe"), "FFmpeg/FFprobe are optional system dependencies")
+    def test_two_source_units_to_two_reviewed_videos_over_real_http(self):
+        source = self.store.root / "original-fixture.txt"
+        source.write_text("Chapter 1\nA keeper sees a blue signal.\nChapter 2\nThe keeper answers with a mirror.")
+        library = Library(self.store)
+        book = library.import_book(source, "Original Lighthouse Fixture", "owned")
+        engine = Engine(self.store, self.cards())
+        series = Series(self.store, engine)
+        created = series.create(book["id"], Brief("Adapt the authorized story", "bookcast", local_only=True))
+        runs = []
+        with patch.dict(os.environ, {"LOOM_TEST_KEY": "test-only-credential"}):
+            for version in [1, 2]:
+                run = series.next(created["id"])
+                self.assertEqual(series.next(created["id"]), run)
+                result = engine.execute(run)
+                film = engine.artifact(run, result["steps"][-1]["result"])
+                self.assertIn(b"ftyp", film.read_bytes()[:64])
+                engine.approve(run)
+                state = series.accept(created["id"], run, "A blue signal was observed; retain the keeper's identity.", version)
+                runs.append(run)
+        self.assertTrue(state["completed"])
+        self.assertEqual(state["cursor"], 2)
+        self.assertEqual(len(set(runs)), 2)
+        self.assertEqual(len(self.calls), 4)
+        prompts = [body["messages"][1]["content"] for path, body, _ in self.calls if path.endswith("chat/completions")]
+        self.assertNotIn("answers with a mirror", prompts[0])
+        self.assertIn("answers with a mirror", prompts[1])
+        self.assertIn("signal was observed", prompts[1])
 
 
 if __name__ == "__main__":

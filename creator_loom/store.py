@@ -46,6 +46,19 @@ class Store:
                   PRIMARY KEY(run_id,step_id));
                 CREATE INDEX IF NOT EXISTS measurements_scope ON measurements(profile,task,signature);
                 CREATE INDEX IF NOT EXISTS feedback_scope ON feedback(profile,capability,model);
+                CREATE TABLE IF NOT EXISTS books (
+                  id TEXT PRIMARY KEY, title TEXT NOT NULL, format TEXT NOT NULL,
+                  source_sha256 TEXT NOT NULL, rights TEXT NOT NULL, rights_note TEXT NOT NULL,
+                  units TEXT NOT NULL, created TEXT DEFAULT CURRENT_TIMESTAMP);
+                CREATE TABLE IF NOT EXISTS series (
+                  id TEXT PRIMARY KEY, definition TEXT NOT NULL, cursor INTEGER NOT NULL DEFAULT 0,
+                  version INTEGER NOT NULL DEFAULT 1, continuity TEXT NOT NULL DEFAULT '',
+                  pending_run TEXT, created TEXT DEFAULT CURRENT_TIMESTAMP);
+                CREATE TABLE IF NOT EXISTS series_episodes (
+                  run_id TEXT PRIMARY KEY, series_id TEXT NOT NULL, position INTEGER NOT NULL,
+                  state TEXT NOT NULL, continuity TEXT, reason TEXT,
+                  created TEXT DEFAULT CURRENT_TIMESTAMP, accepted TEXT);
+                CREATE INDEX IF NOT EXISTS episodes_series ON series_episodes(series_id,position);
             ''')
 
     @contextmanager

@@ -86,21 +86,18 @@ class Learning:
                     candidate["plan"]["technique_snapshot"] != proposal):
                 raise ValueError("Evaluation does not match the proposal's frozen baseline")
             def context(plan):
-                return {"preferences": plan["preferences"],
+                return {"preferences": plan["preferences"], "source_context": plan.get("context"),
                         "steps": [{k: step[k] for k in ["id", "capability", "dependencies", "model"]}
                                   for step in plan["steps"]]}
             if context(baseline["plan"]) != context(candidate["plan"]):
-                raise ValueError("Paired evaluation must freeze model and preference context")
+                raise ValueError("Paired evaluation must freeze model and preference context, including source and continuity")
             topic = baseline["brief"]["topic"]
             if topic in topics or baseline["id"] in runs or candidate["id"] in runs:
                 raise ValueError("Evaluation needs distinct topics and run pairs")
             topics.add(topic)
             runs.update([baseline["id"], candidate["id"]])
             for run in [baseline, candidate]:
-                for step in run["steps"]:
-                    self.engine.artifact(run["id"], step["result"])
-                    for supplement in step["result"]["supplements"]:
-                        self.engine.artifact(run["id"], supplement)
+                self.engine.verify_artifacts(run)
                 bindings.append({"run": run["id"], "results": [s["result"] for s in run["steps"]]})
             a = bounded(pair["baseline_score"], 0, 1, "baseline_score")
             b = bounded(pair["candidate_score"], 0, 1, "candidate_score")
@@ -131,6 +128,10 @@ class Learning:
             if not evaluation["passed"]:
                 raise ValueError("Evaluation did not pass")
             for binding in evaluation["bindings"]:
+                bound_run = self.store.run(binding["run"])
+                if bound_run["status"] != "approved":
+                    raise ValueError("Evaluated run is no longer approved")
+                self.engine.verify_artifacts(bound_run)
                 for result in binding["results"]:
                     self.engine.artifact(binding["run"], result)
                     for supplement in result["supplements"]:

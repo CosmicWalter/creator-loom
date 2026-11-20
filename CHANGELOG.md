@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.0
+
+- Import explicitly authorized TXT and unencrypted EPUB sources, preserve original/source-unit hashes and split long chapters into bounded units without copying local filenames or source paths.
+- Adapt individual source units through existing multimodal recipes; freeze original text, provenance and reviewed continuity in each plan.
+- Add sequential series creation with atomic pending-run reservation, idempotent next calls, artifact-bound acceptance and optimistic continuity versions.
+- Keep rejected attempts and source position, cancel unexecuted plans, and require explicit provider reconciliation before detaching uncertain attempts. Running episodes cannot be detached.
+- Include source/continuity in paired technique comparisons and recheck provenance during promotion.
+- Add original example fiction and real HTTP/two-video series integration coverage using simulated inference and actual FFmpeg.
+
 ## 0.3.0
 
 - Route by format/stage quality priors, isolated feedback and backend/generation signatures. A novel outline and chapter can select different specialists.

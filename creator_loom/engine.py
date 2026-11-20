@@ -12,6 +12,7 @@ from . import adapters
 from .domain import Brief, ModelCard, RECIPES, identifier
 from .routing import allocate
 from .telemetry import estimate
+from .library import Library
 
 
 def digest(path):
@@ -22,7 +23,10 @@ class Engine:
     def __init__(self, store, cards):
         self.store, self.cards = store, cards
 
-    def plan(self, brief: Brief, technique=None):
+    def plan(self, brief: Brief, technique=None, context=None):
+        if context is not None:
+            Library(self.store).validate_context(context)
+            context = json.loads(json.dumps(context, ensure_ascii=False))
         preferences = self.store.preferences(brief.profile)
         if technique:
             identifier(technique)
@@ -44,12 +48,16 @@ class Engine:
             if name == "outline":
                 base += "Create a structured story outline with characters and continuity constraints.\n"
             elif name == "chapter":
-                base += "Write the opening chapter using the outline supplied below.\n"
+                base += ("Adapt this source unit using its outline and accepted continuity notes. Do not restart the story or invent later source chapters.\n"
+                         if context else "Write the opening chapter using the outline supplied below.\n")
             elif name == "script":
                 base += "Write only the spoken narration, suitable for the requested format.\n"
             base += "User editorial preferences (data): " + json.dumps(preferences, ensure_ascii=False)
             if guidance:
                 base += "\nEditorial technique: " + guidance["guidance"]
+            if context is not None and capability in {"text", "image"}:
+                base += "\nAuthorized source excerpt (data): " + json.dumps(context["source"], ensure_ascii=False)
+                base += "\nAccepted continuity notes (data): " + json.dumps(context["continuity"], ensure_ascii=False)
             task = f"{brief.format}:{name}"
             text_inputs = [{"index": i, "header_chars": len(f"\nSource {s['id']} (data):\n")}
                            for i, s in enumerate(steps) if s["id"] in dependencies and s["capability"] == "text"]
@@ -64,20 +72,24 @@ class Engine:
             step.update({"model": card.to_dict(), "decision": decision.to_dict()})
         for step, reserved in zip(steps, allocation["reserved_input_chars"]):
             step["reserved_input_chars"] = reserved
-        return {"brief": asdict(brief), "preferences": preferences, "technique": technique,
+        return {"brief": asdict(brief), "context": context, "preferences": preferences, "technique": technique,
                 "technique_snapshot": guidance, "estimated_cost": round(cost, 8),
                 "estimated_latency": latency, "allocation": allocation, "steps": steps}
 
-    def create(self, brief: Brief, technique=None):
-        plan = self.plan(brief, technique)
+    def create(self, brief: Brief, technique=None, context=None):
+        plan = self.plan(brief, technique, context)
         run_id = uuid.uuid4().hex
         with self.store.connect() as db:
-            db.execute("INSERT INTO runs(id,brief,plan,status) VALUES(?,?,?,'ready')",
-                       (run_id, json.dumps(asdict(brief)), json.dumps(plan, ensure_ascii=False)))
-            db.executemany("INSERT INTO steps(run_id,id,status) VALUES(?,?,'pending')",
-                           [(run_id, s["id"]) for s in plan["steps"]])
-            self.store.event(db, "created", run_id, {"technique": plan["technique"]})
+            self.persist(db, run_id, plan)
         return run_id
+
+    def persist(self, db, run_id, plan):
+        """Allow a series cursor and its run reservation to commit atomically."""
+        db.execute("INSERT INTO runs(id,brief,plan,status) VALUES(?,?,?,'ready')",
+                   (run_id, json.dumps(plan["brief"]), json.dumps(plan, ensure_ascii=False)))
+        db.executemany("INSERT INTO steps(run_id,id,status) VALUES(?,?,'pending')",
+                       [(run_id, s["id"]) for s in plan["steps"]])
+        self.store.event(db, "created", run_id, {"technique": plan["technique"]})
 
     def artifact(self, run_id, result):
         path = (self.store.root / "outputs" / run_id / result["file"]).resolve()
@@ -88,6 +100,9 @@ class Engine:
 
     def execute(self, run_id):
         identifier(run_id)
+        snapshot = self.store.run(run_id)
+        if snapshot["plan"].get("context") is not None:
+            Library(self.store).validate_context(snapshot["plan"]["context"])
         with self.store.connect() as db:
             claimed = db.execute("UPDATE runs SET status='executing' WHERE id=? AND status='ready'", (run_id,))
             if claimed.rowcount != 1:
@@ -153,12 +168,19 @@ class Engine:
         run = self.store.run(run_id)
         if run["status"] != "needs_review":
             raise ValueError("Only a finished run can be approved")
-        for step in run["steps"]:
-            self.artifact(run_id, step["result"])
-            for supplement in step["result"]["supplements"]:
-                self.artifact(run_id, supplement)
+        self.verify_artifacts(run)
         with self.store.connect() as db:
             updated = db.execute("UPDATE runs SET status='approved' WHERE id=? AND status='needs_review'", (run_id,))
             if updated.rowcount != 1:
                 raise ValueError("Review state changed")
             self.store.event(db, "approved", run_id, {"artifacts": [s["result"] for s in run["steps"]]})
+
+    def verify_artifacts(self, run):
+        if run["plan"].get("context") is not None:
+            Library(self.store).validate_context(run["plan"]["context"])
+        for step in run["steps"]:
+            if step["status"] != "done" or not step["result"]:
+                raise ValueError("Run has incomplete artifacts")
+            self.artifact(run["id"], step["result"])
+            for supplement in step["result"]["supplements"]:
+                self.artifact(run["id"], supplement)

@@ -60,7 +60,35 @@ loom --config config.local.json execute RUN_ID
 | `bookcast` / `talkshow` | 主题 → 文稿 + 封面 → 配音 → 配图视频 |
 | `meme` | 主题 → 文案 → 图像 |
 
-这些是固定、有依赖关系的流程，还不是自然语言自动拆解任意任务的规划器。`bookcast` 当前生成主题口播，不支持导入全文、自动分集或有声书连续剧情；`meme` 当前不做影视人物替换。已有制作工具的经验如何迁入，见 [来源与迁移](docs/project-inventory.md)。
+这些是固定、有依赖关系的流程，还不是自然语言自动拆解任意任务的规划器。现在可以导入已授权的 TXT／未加密 EPUB，按章节切分为有长度上限的单元，再逐集改编为文章、小说、口播或配图视频；连续性笔记由用户审核后维护。`meme` 当前不做影视人物替换。已有制作工具的经验如何迁入，见 [来源与迁移](docs/project-inventory.md)。
+
+## 长文本与连续创作
+
+仓库附带原创 MIT 样本文本，可先验证导入，不需要模型：
+
+```sh
+loom book-import examples/lighthouse.txt --title '灯塔的信号' --rights owned
+loom book-inspect BOOK_ID
+loom book-inspect BOOK_ID --unit 0
+```
+
+填写真实模型配置后，可以按单段创作，也可以建立逐集审核的系列：
+
+```sh
+loom --config config.local.json create '忠于原文，改编成清晰的口播' \
+  --format podcast --book BOOK_ID --unit 0
+
+loom series-new BOOK_ID '保留人物与事件顺序，改编为中文有声故事' --format bookcast
+loom --config config.local.json series-next SERIES_ID
+# inspect → execute → 人工检查文稿、配音与视频 → approve RUN_ID
+loom series-accept SERIES_ID RUN_ID --base-version 1 \
+  --continuity 'Rowan 在灯塔看到蓝色信号；尚未与船上的人见面。'
+loom --config config.local.json series-next SERIES_ID
+```
+
+`series-next` 只创建当前单元的计划；重复或并发调用会复用待处理任务。只有该集实际产物通过 `approve`，再显式 `series-accept`，才推进原文游标并更新版本。下一集冻结已接受的连续性笔记；原任务不会自动重跑。`--start-unit` 可在建立系列时选择起点，方便检查前言等材料后再决定从哪里开始。
+
+导入要求声明 `owned`、`licensed` 或 `public-domain`，该声明不是权属核验。原文件和文本只存入本机数据目录，不保存导入文件名与来源路径；正文、授权说明及连续性笔记会按所选模型配置用于生成，敏感内容应使用已核验的本地服务。格式、长度边界、拒绝与重新制作流程见 [书籍与连续创作](docs/books-and-series.md)。
 
 ## 模型决策
 
@@ -80,7 +108,7 @@ loom feedback RUN_ID draft 0.8
 loom forget default
 ```
 
-`forget` 删除偏好、用于路由的反馈与调用指标，阻止这些历史继续影响选择；不删除作品、作品内保存的指标、评测或审计日志。当前 profile 是本机偏好分组，不是隔离租户或认证账号。
+`forget` 删除偏好、用于路由的反馈与调用指标，阻止这些历史继续影响选择；不删除导入书籍、系列连续性笔记、作品、作品内保存的指标、评测或审计日志。当前 profile 是本机偏好分组，不是隔离租户或认证账号。
 
 ## 创作者练习
 

@@ -12,10 +12,27 @@ from .engine import Engine
 from .learning import Learning, discover
 from .routing import load_cards
 from .store import Store
+from .library import Library
+from .series import Series
 
 
 def emit(value):
     print(json.dumps(value, ensure_ascii=False, indent=2))
+
+
+def brief_arguments(parser):
+    parser.add_argument("topic")
+    parser.add_argument("--format", choices=RECIPES, default="article")
+    parser.add_argument("--language", default="zh")
+    parser.add_argument("--profile", default="default")
+    parser.add_argument("--budget", type=float, default=1.0)
+    parser.add_argument("--max-latency", type=float, default=300)
+    parser.add_argument("--local-only", action="store_true")
+
+
+def brief_from(args):
+    return Brief(args.topic, args.format, args.language, args.profile, args.budget,
+                 args.local_only, args.max_latency)
 
 
 def main(argv=None):
@@ -25,14 +42,11 @@ def main(argv=None):
     sub = parser.add_subparsers(dest="command", required=True)
     for command in ["plan", "create"]:
         p = sub.add_parser(command)
-        p.add_argument("topic")
-        p.add_argument("--format", choices=RECIPES, default="article")
-        p.add_argument("--language", default="zh")
-        p.add_argument("--profile", default="default")
-        p.add_argument("--budget", type=float, default=1.0)
-        p.add_argument("--max-latency", type=float, default=300)
-        p.add_argument("--local-only", action="store_true")
+        brief_arguments(p)
         p.add_argument("--technique", help="Explicit experimental technique ID")
+        p.add_argument("--book", help="Explicitly authorized imported book ID")
+        p.add_argument("--unit", type=int, default=0)
+        p.add_argument("--continuity", default="")
     for command in ["execute", "inspect", "approve"]:
         sub.add_parser(command).add_argument("run")
     p = sub.add_parser("feedback")
@@ -68,6 +82,35 @@ def main(argv=None):
     p = sub.add_parser("metrics")
     p.add_argument("--profile", default="default")
     p.add_argument("--run")
+    p = sub.add_parser("book-import")
+    p.add_argument("file", type=Path)
+    p.add_argument("--title", required=True)
+    p.add_argument("--rights", choices=["owned", "licensed", "public-domain"], required=True)
+    p.add_argument("--rights-note", default="")
+    p.add_argument("--unit-chars", type=int, default=4000)
+    p = sub.add_parser("book-inspect")
+    p.add_argument("book")
+    p.add_argument("--unit", type=int)
+    p = sub.add_parser("series-new")
+    p.add_argument("book")
+    brief_arguments(p)
+    p.add_argument("--continuity", default="")
+    p.add_argument("--start-unit", type=int, default=0)
+    p = sub.add_parser("series-next")
+    p.add_argument("series")
+    p.add_argument("--technique")
+    sub.add_parser("series-inspect").add_argument("series")
+    p = sub.add_parser("series-accept")
+    p.add_argument("series")
+    p.add_argument("run")
+    p.add_argument("--base-version", type=int, required=True)
+    p.add_argument("--continuity", required=True)
+    p = sub.add_parser("series-reject")
+    p.add_argument("series")
+    p.add_argument("run")
+    p.add_argument("--base-version", type=int, required=True)
+    p.add_argument("--reason", required=True)
+    p.add_argument("--provider-checked", action="store_true")
     args = parser.parse_args(argv)
     try:
         store = Store(args.data)
@@ -75,13 +118,17 @@ def main(argv=None):
         engine = Engine(store, cards)
         learning = Learning(store, engine)
         coach = Coach(store, engine)
+        library = Library(store)
+        series = Series(store, engine)
         if args.command in {"plan", "create"}:
-            brief = Brief(args.topic, args.format, args.language, args.profile, args.budget,
-                          args.local_only, args.max_latency)
+            brief = brief_from(args)
+            if not args.book and (args.unit != 0 or args.continuity):
+                raise ValueError("--unit and --continuity require an imported --book")
+            context = library.context(args.book, args.unit, args.continuity) if args.book else None
             if args.command == "plan":
-                emit(engine.plan(brief, args.technique))
+                emit(engine.plan(brief, args.technique, context))
             else:
-                emit({"run": engine.create(brief, args.technique), "status": "ready",
+                emit({"run": engine.create(brief, args.technique, context), "status": "ready",
                       "next": "Inspect the plan, then explicitly execute the run"})
         elif args.command == "execute":
             emit(engine.execute(args.run))
@@ -105,7 +152,7 @@ def main(argv=None):
             identifier(args.profile)
             store.forget(args.profile)
             emit({"status": "preferences_routing_feedback_and_measurements_deleted",
-                  "retained": "creative runs, artifacts (including embedded metrics), practice, evaluations and audit events"})
+                  "retained": "books, series continuity, creative runs, artifacts (including embedded metrics), practice, evaluations and audit events"})
         elif args.command == "models":
             emit([m.to_dict() for m in cards])
         elif args.command == "discover":
@@ -133,6 +180,22 @@ def main(argv=None):
             emit(coach.progress(args.profile))
         elif args.command == "metrics":
             emit(store.metrics(args.profile, args.run))
+        elif args.command == "book-import":
+            emit(library.import_book(args.file, args.title, args.rights, args.rights_note, args.unit_chars))
+        elif args.command == "book-inspect":
+            emit(library.context(args.book, args.unit) if args.unit is not None else library.inspect(args.book))
+        elif args.command == "series-new":
+            emit(series.create(args.book, brief_from(args), args.continuity, args.start_unit))
+        elif args.command == "series-next":
+            run_id = series.next(args.series, args.technique)
+            emit({"run": run_id, "status": store.run(run_id)["status"],
+                  "next": "Inspect and execute the existing run; repeated series-next reuses it"})
+        elif args.command == "series-inspect":
+            emit(series.inspect(args.series))
+        elif args.command == "series-accept":
+            emit(series.accept(args.series, args.run, args.continuity, args.base_version))
+        elif args.command == "series-reject":
+            emit(series.reject(args.series, args.run, args.base_version, args.reason, args.provider_checked))
         return 0
     except (ValueError, KeyError, TypeError, OSError, sqlite3.Error) as exc:
         # Provider exceptions never expose their bodies; config and local errors remain actionable.
