@@ -1,0 +1,48 @@
+# Local creation workbench
+
+```sh
+loom serve --open
+loom --config config.local.json serve --port 8787 --open
+```
+
+The workbench listens only on `127.0.0.1`. The terminal displays a local URL with a random access code in its fragment. On connection, the page exchanges that code for an HttpOnly, SameSite=Strict host cookie and removes the fragment from browser history. The code is not embedded in HTML/JavaScript or stored in the repository. Restarting the server changes the code/session. Sessions last eight hours from the last successful connection.
+
+There is no public hosting, account/tenant system or remote collaboration in this version. Local profile names group preferences and feedback; they are not permissions. Source books and research observations belong to the single local owner. The interface loads no external fonts, scripts, analytics or image services. Configured model calls and explicit research operations retain their separate network behavior.
+
+## Creation and review
+
+The creation page previews a brief using the existing planner. Every preview is a persisted plan snapshot with a 30-minute confirmation window. Creating a run uses that exact snapshot rather than silently replanning after model scores/preferences change. Editing the form invalidates its displayed preview. Network retries with the same creation key return the original run.
+
+The default no-key example is a real local graphic/SVG cover, not simulated AI inference. Text, generative images, audio and narration video still require their configured providers. The displayed counts are actual recent runs, waiting reviews and enabled model/tool configurations; they are not live model health checks or creative-quality measurements.
+
+Execution starts only when requested, through a small background task pool. The browser polls saved action status; repeated action keys do not resubmit. A workbench restart marks leftover web actions interrupted without executing them again. Existing engine locks and remote receipt/reconciliation rules remain in effect. A waiting MediaFlow run can be explicitly continued; unknown synchronous calls cannot be replayed.
+
+Text is displayed as text, not executed Markdown/HTML. Media previews use authenticated, digest-verified artifact routes, including byte ranges for audio/video. Changed/missing artifacts block preview or approval. Review confirms the actual files locally and does not publish to social platforms.
+
+## Books, learning and practice
+
+The book shelf imports TXT/unencrypted EPUB with explicit source-rights declarations and an eight-megabyte upload limit. It uses generic temporary names, not the original local filename/path. Inspect source units before creating a series. Series planning and acceptance retain the existing optimistic continuity versions and artifact-bound review.
+
+The learning radar shows subscribed sources, literal keyword evidence and preserved review states. It can turn reviewed evidence into a proposed editorial method, but cannot bypass paired evaluation or activate it. Subscription configuration, evaluation/activation, broader editing and some recovery operations remain available through the CLI.
+
+Completed works offer medium-specific review questions. The browser revision editor currently supports text steps; it records an actually changed draft, dimension, before/after self-ratings and a rationale. Other media retain review questions and ordinary feedback. Progress is self-reported, not proof of independently measured skill gains.
+
+## Deliverable bundles
+
+An approved run can download a ZIP containing explicitly allowed creative files plus a manifest of their hashes. Raw plans, endpoints, profiles, source books, practice data, idempotency keys, remote IDs and provider usage/operational sidecars are not included. Timing JSON is rebuilt from start/end/text only. Archive entry timestamps are fixed and do not preserve the host's clock or filesystem metadata.
+
+The bundle intentionally contains the creative work itself. It does not automatically remove private information depicted/spoken/written in content, validate rights, reconstruct required third-party attribution or scrub every media format's embedded metadata. Review the work and required credits before sharing. Download is local delivery, not public publication.
+
+## HTTP boundary and storage
+
+API access requires a valid local session. Host checks reject alternate/rebinding hosts, cross-origin API access is rejected, and JSON mutations require a custom request header. The public shell contains no code/session secret. Content security policies restrict script sources; artifact responses are sandboxed. HTTP request logging is disabled. Client-facing errors do not include local paths, stack traces, provider responses or credentials.
+
+Requests are bounded; files are addressed through verified run/step slots rather than caller-selected filesystem paths. One workbench process owns a data directory at a time through an OS lock. The server is a single-user development product, not a general-purpose hardened Internet server.
+
+Drafts, actions and run data persist in the selected data directory, which is ignored by Git. Expired previews are retained for now but cannot be confirmed. `forget PROFILE` does not erase workbench/creative/audit history. Shut down normally to let in-flight calls save their receipts; forced termination can still produce an unknown operation requiring reconciliation.
+
+## Verification status
+
+Real HTTP tests cover authentication, Host/Origin boundaries, frozen/idempotent creation, background cover execution, verified previews/ranges, approval/export, source import/series setup, text revision practice, session renewal and non-replayed interrupted actions. JavaScript syntax and packaged frontend assets are checked separately.
+
+Browser interaction and visual acceptance have not yet been recorded. HTTP tests and source inspection do not establish responsive layout quality or prove that every browser interaction works. Continue that acceptance before presenting the workbench as production ready.

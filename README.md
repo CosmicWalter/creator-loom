@@ -4,7 +4,7 @@
 
 面向文字、图片、音频、视频的开源创作 Agent。目标是把创作、模型决策、个人偏好和技术迭代放进一个可检查的闭环，让作品和创作者一起进步。
 
-**状态：早期可运行原型，不是已经达到行业标杆的成品。** Python 3.11+，核心零运行时依赖，MIT 开源。当前入口是 CLI；没有网页工作台、平台投稿、通用自主工具执行或自动训练模型权重。
+**状态：早期可运行原型，不是已经达到行业标杆的成品。** Python 3.11+，核心零运行时依赖，MIT 开源。提供 CLI 和仅本机访问的网页工作台；尚无平台投稿、通用自主工具执行或自动训练模型权重。
 
 ## 立即运行
 
@@ -14,6 +14,16 @@ cd creator-loom
 python3 -m venv .venv
 . .venv/bin/activate
 python -m pip install -e .
+
+# 打开本地工作台；访问码只由启动终端提供，不写入前端文件。
+loom serve --open
+```
+
+工作台支持方案预览、按冻结方案制作、作品预览与审核、交付包、书籍／连续作品、学习收件箱和文字修改练习。默认使用无需密钥的本地图形封面体验；其他创作形式读取启动时配置的模型。可用 `loom --config config.local.json serve --open` 加载自己的模型配置。界面与本机访问边界见 [工作台说明](docs/workbench.md)。
+
+也可以继续使用 CLI：
+
+```sh
 
 # 不需要密钥或模型：生成真实的本地图形封面，不冒充 AI 绘画。
 loom plan '海边的阅读时光' --format cover --local-only --budget 0
@@ -127,7 +137,7 @@ loom feedback RUN_ID draft 0.8
 loom forget default
 ```
 
-`forget` 删除偏好、用于路由的反馈与调用指标，阻止这些历史继续影响选择；不删除远端任务凭据、研究订阅与资料、导入书籍、系列连续性笔记、作品、作品内保存的指标、评测或审计日志。当前 profile 是本机偏好分组，不是隔离租户或认证账号。
+`forget` 删除偏好、用于路由的反馈与调用指标，阻止这些历史继续影响选择；不删除工作台方案与操作记录、远端任务凭据、研究订阅与资料、导入书籍、系列连续性笔记、作品、作品内保存的指标、评测或审计日志。当前 profile 是本机偏好分组，不是隔离租户或认证账号。
 
 ## 创作者练习
 
@@ -193,6 +203,7 @@ loom rollback concrete-detail
 
 ```sh
 python -m unittest discover -s tests -v
+node --check creator_loom/static/app.js
 python scripts/check_publication.py
 ```
 

@@ -43,6 +43,9 @@ def main(argv=None):
     parser.add_argument("--data", type=Path, default=Path("data"))
     parser.add_argument("--config", type=Path)
     sub = parser.add_subparsers(dest="command", required=True)
+    p = sub.add_parser("serve")
+    p.add_argument("--port", type=int, default=8787)
+    p.add_argument("--open", action="store_true", help="Open the local authenticated workbench")
     for command in ["plan", "create"]:
         p = sub.add_parser(command)
         brief_arguments(p)
@@ -173,7 +176,22 @@ def main(argv=None):
         library = Library(store)
         series = Series(store, engine)
         research = Research(store, learning)
-        if args.command in {"plan", "create"}:
+        if args.command == "serve":
+            from .workbench import create_server
+            if not 0 <= args.port <= 65535:
+                raise ValueError("Invalid port")
+            server = create_server(store, cards, args.port)
+            url = server.origin+"/#"+server.code
+            print("Creator Loom — 本地创作工作台", flush=True)
+            print(url, flush=True)
+            if args.open:
+                import webbrowser
+                webbrowser.open(url)
+            try:
+                server.serve_forever()
+            finally:
+                server.server_close()
+        elif args.command in {"plan", "create"}:
             brief = brief_from(args)
             if not args.book and (args.unit != 0 or args.continuity):
                 raise ValueError("--unit and --continuity require an imported --book")
@@ -231,7 +249,7 @@ def main(argv=None):
             identifier(args.profile)
             store.forget(args.profile)
             emit({"status": "preferences_routing_feedback_and_measurements_deleted",
-                  "retained": "remote operation receipts, research subscriptions/evidence, books, series continuity, creative runs, artifacts (including embedded metrics), practice, evaluations and audit events"})
+                  "retained": "workbench plans/actions, remote operation receipts, research subscriptions/evidence, books, series continuity, creative runs, artifacts (including embedded metrics), practice, evaluations and audit events"})
         elif args.command == "models":
             emit([m.to_dict() for m in cards])
         elif args.command == "discover":

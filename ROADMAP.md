@@ -26,7 +26,9 @@ This is a delivery backlog, not a promise that the complete product is already a
 - [ ] ComfyUI adapter, MediaFlow transcription delivery and additional asynchronous model providers.
 - [x] Bounded TXT/unencrypted EPUB import, chapter/unit provenance and reviewed sequential creation with frozen continuity notes.
 - [ ] Rich character memory, automatic continuity proposals, editable timeline and shot-level review.
-- [ ] Local creation workbench, asset library and structured preview/export.
+- [x] Authenticated loopback workbench, frozen plan confirmation, artifact preview/review and structured deliverable export.
+- [x] Workbench book import, sequential creation, research inbox and text revision practice backed by existing APIs.
+- [ ] Browser interaction/visual acceptance and further usability iteration; generalized media asset library and timeline editing.
 
 ## Learning system and open benchmark
 

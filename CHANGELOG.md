@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.0
+
+- Add a dependency-free, authenticated loopback workbench for creation, archives, books/series, research review and creator practice. It reads actual persisted state, without fabricated dashboard metrics.
+- Freeze previewed plans before confirmation; persist idempotent creation/action keys and do not replay interrupted background actions on server restart.
+- Preview hash-verified text, image, audio and video artifacts with range support. Retain existing explicit execution, asynchronous recovery and review gates.
+- Export only reviewed deliverables through an allowlist, excluding execution receipts and provider usage sidecars. Sanitize timing fields and use neutral archive timestamps with content hashes.
+- Add real HTTP workbench flows and boundary checks, plus wheel asset checks. Browser interaction and visual acceptance remain pending in this release.
+
 ## 0.6.0
 
 - Add optional local MediaFlow narration with explicit reference-voice authorization, bounded uploads, segmented requests, durable task IDs and validated PCM assembly/timings.
