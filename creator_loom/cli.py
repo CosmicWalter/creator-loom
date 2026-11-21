@@ -247,6 +247,14 @@ def main(argv=None):
             p.add_argument("--review", type=Path, required=True)
         if command == "lab-experiment":
             p.add_argument("--settings", type=Path, required=True)
+    for command in ["practice-blind", "practice-review-inspect", "practice-review-packet", "practice-review-score", "practice-review-report"]:
+        p = sub.add_parser(command)
+        p.add_argument("id")
+        if command == "practice-review-score":
+            p.add_argument("--a", type=float, required=True)
+            p.add_argument("--b", type=float, required=True)
+            p.add_argument("--reviewer-kind", choices=["self", "external-declared"], required=True)
+            p.add_argument("--rationale", required=True)
     args = parser.parse_args(argv)
     try:
         store = Store(args.data)
@@ -257,7 +265,21 @@ def main(argv=None):
         library = Library(store)
         series = Series(store, engine)
         research = Research(store, learning)
-        if args.command.startswith("lab-"):
+        if args.command == "practice-blind":
+            emit(coach.new_review(args.id))
+        elif args.command.startswith("practice-review-"):
+            action = args.command.removeprefix("practice-review-")
+            if action == "score":
+                emit(coach.score_review(args.id, {"A": args.a, "B": args.b}, args.reviewer_kind, args.rationale))
+            elif action == "packet":
+                directory = store.root/"practice_packets"
+                directory.mkdir(exist_ok=True)
+                path = directory/(args.id+".zip")
+                path.write_bytes(coach.review_packet(args.id))
+                emit({"file": str(path), "uploaded": False})
+            else:
+                emit(getattr(coach, "review_"+action)(args.id))
+        elif args.command.startswith("lab-"):
             lab = Lab(store, cards)
             action = args.command.removeprefix("lab-")
             if action == "new":

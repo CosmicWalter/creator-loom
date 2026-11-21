@@ -221,7 +221,7 @@ async function navigate(view) {
   if (view === "runs") runsView();
   if (view === "books") booksView();
   if (view === "research") await researchView();
-  if (view === "growth") growthView();
+  if (view === "growth") await growthView();
   if (view === "timelines") await timelineView();
   if (view === "assets") await mediaView();
 }
@@ -1125,7 +1125,7 @@ function proposalDialog(item) {
   );
   modal(box);
 }
-function growthView() {
+async function growthView() {
   const root = $("#content"),
     progress = state.overview.progress;
   add(
@@ -1164,6 +1164,7 @@ function growthView() {
       "这里展示人工自评记录，不代表经独立验证的技能提升。",
     ),
   );
+  await practiceReviewSection(root, progress);
   recent(root);
 }
 async function connect(code) {

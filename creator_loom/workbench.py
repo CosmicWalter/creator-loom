@@ -222,6 +222,11 @@ class Workbench:
 
     def get(self, path, query):
         profile = identifier(query.get("profile", ["default"])[0])
+        if path == "/api/practice":
+            return self.coach.practice_list(profile)
+        match = re.fullmatch(r"/api/practice-reviews/([A-Za-z0-9_-]+)(/report)?", path)
+        if match:
+            return self.coach.review_report(match[1]) if match[2] else self.coach.review_inspect(match[1])
         if path == "/api/assets":
             return self.assets.list(profile, query.get("state", [None])[0])
         match = re.fullmatch(r"/api/assets/([A-Za-z0-9_-]+)", path)
@@ -304,6 +309,12 @@ class Workbench:
         raise ValueError("Unknown endpoint")
 
     def post(self, path, body, key):
+        match = re.fullmatch(r"/api/practice/([A-Za-z0-9_-]+)/blind", path)
+        if match:
+            return self.coach.new_review(match[1])
+        match = re.fullmatch(r"/api/practice-reviews/([A-Za-z0-9_-]+)/score", path)
+        if match:
+            return self.coach.score_review(match[1], body["scores"], body["reviewer_kind"], body["rationale"])
         if path == "/api/labs":
             identifier(key)
             return self.lab.create(body["id"], body["spec"], key)
@@ -504,10 +515,10 @@ class Handler(BaseHTTPRequestHandler):
             if self.headers.get("Host") != urlsplit(self.server.origin).netloc:
                 return self.respond(403, {"error": "只允许本机工作台访问。"})
             parsed = urlsplit(self.path)
-            if parsed.path in {"/", "/app.js", "/app.css", "/timeline.js", "/media.js", "/lab.js"}:
-                name = {"/": "index.html", "/app.js": "app.js", "/app.css": "app.css", "/timeline.js": "timeline.js", "/media.js": "media.js", "/lab.js": "lab.js"}[parsed.path]
+            if parsed.path in {"/", "/app.js", "/app.css", "/timeline.js", "/media.js", "/lab.js", "/practice.js"}:
+                name = {"/": "index.html", "/app.js": "app.js", "/app.css": "app.css", "/timeline.js": "timeline.js", "/media.js": "media.js", "/lab.js": "lab.js", "/practice.js": "practice.js"}[parsed.path]
                 raw = (Path(__file__).parent/"static"/name).read_bytes()
-                mime = {"index.html": "text/html", "app.js": "text/javascript", "app.css": "text/css", "timeline.js": "text/javascript", "media.js": "text/javascript", "lab.js": "text/javascript"}[name]
+                mime = {"index.html": "text/html", "app.js": "text/javascript", "app.css": "text/css", "timeline.js": "text/javascript", "media.js": "text/javascript", "lab.js": "text/javascript", "practice.js": "text/javascript"}[name]
                 self.headers_for(200, mime+"; charset=utf-8", len(raw))
                 return self.wfile.write(raw)
             if not self.trusted():
@@ -516,6 +527,18 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond(401, {"error": "请输入本机工作台访问码。"})
             if parsed.path == "/api/session":
                 return self.respond(200, {"authenticated": True})
+            match = re.fullmatch(r"/api/practice-reviews/([A-Za-z0-9_-]+)/(packet|A|B)", parsed.path)
+            if match:
+                name, label = match.groups()
+                coach = self.server.app.coach
+                if label == "packet":
+                    raw = coach.review_packet(name)
+                    self.headers_for(200, "application/zip", len(raw), {"Content-Disposition": 'attachment; filename="creator-loom-practice-review.zip"'})
+                    return self.wfile.write(raw)
+                review = coach.review_load(name)
+                run = coach.verify_review(review)
+                version = review["display_order"][["A", "B"].index(label)]
+                return self.stream_file(coach.engine.artifact(run["id"], review["binding"][version]))
             match = re.fullmatch(r"/api/labs/([A-Za-z0-9_-]+)/cases/([A-Za-z0-9_-]+)/(A|B|packet)", parsed.path)
             if match:
                 name, case_id, label = match.groups()

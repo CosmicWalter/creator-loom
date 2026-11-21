@@ -570,3 +570,40 @@ class WorkbenchTest(unittest.TestCase):
             self.assertEqual(self.api("POST", "/api/labs/http-lab/rollback", {})["technique_state"], "retired")
         self.assertEqual(len(self.api("GET", "/api/research")["labs"]), 1)
         self.assertEqual(self.api("GET", "/api/research?profile=other")["labs"], [])
+
+
+    def test_practice_blind_http_packet_scores_report_and_tamper_rejection(self):
+        self.login()
+        self.server.app.cards.append(ModelCard("practice-writer", "text", "chat", model="fixture", local=True, endpoint="http://127.0.0.1:8765/v1"))
+        draft = self.api("POST", "/api/plans", {"brief": {"topic": "Original short story of a fictional observatory", "format": "article"}})
+        run = self.api("POST", "/api/runs", {"draft": draft["draft"]}, {"Idempotency-Key": uuid.uuid4().hex})["run"]
+        def fake(card, prompt, dependencies, directory, key=""):
+            directory.mkdir(parents=True, exist_ok=True)
+            path = directory/"content.md"; path.write_text("A quiet observer saw a light."); return path
+        with patch.object(adapters, "execute", fake): self.run_action(run)
+        practice = self.api("POST", f"/api/runs/{run}/practice", {"step": "draft", "revision": "A blue signal flashed twice above the observatory.", "dimension": "clarity", "before": 0.2, "after": 0.9, "rationale": "Private saved rationale excluded from the blind packet."})
+        review = self.api("POST", f"/api/practice/{practice['practice']}/blind", {})
+        self.assertEqual(self.api("POST", f"/api/practice/{practice['practice']}/blind", {})["id"], review["id"])
+        base = "/api/practice-reviews/"+review["id"]
+        self.assertEqual(self.request("GET", base+"/report")[0], 409)
+        self.assertEqual(self.request("GET", base+"/packet", auth=False)[0], 401)
+        self.assertEqual(self.request("GET", base+"/A", headers={"Origin": "https://example.com"})[0], 403)
+        status, headers, raw = self.request("GET", base+"/packet")
+        self.assertEqual(status, 200)
+        with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+            self.assertEqual(set(archive.namelist()), {"A.txt", "B.txt", "review.json"})
+            packet = archive.read("review.json").decode()
+            for excluded in ["0.9", run, "Private saved rationale", "practice-writer"]: self.assertNotIn(excluded, packet)
+        self.assertEqual(self.request("GET", base+"/A")[0], 200)
+        body = {"scores": {"A": 0.4, "B": 0.6}, "reviewer_kind": "external-declared", "rationale": "Fixture comparison scores are not evidence of actual skill improvement."}
+        report = self.api("POST", base+"/score", body)
+        self.assertEqual(report["reviewer_kind"], "external-declared")
+        self.assertEqual(self.request("POST", base+"/score", body)[0], 409)
+        self.assertTrue(self.api("GET", "/api/practice")[0]["reviewed"])
+        self.assertEqual(self.api("GET", "/api/practice?profile=other"), [])
+        progress = self.api("GET", "/api/overview")["progress"]["blind_revision_reviews"]
+        self.assertEqual(progress["dimensions"][0]["comparisons"], 1)
+        revised = self.server.app.engine.artifact(run, practice["artifact"]); revised.write_text("Changed stored revision")
+        self.assertEqual(self.request("GET", base+"/report")[0], 409)
+        self.assertEqual(self.request("GET", base+"/packet")[0], 409)
+        self.assertEqual(self.api("GET", "/api/overview")["progress"]["blind_revision_reviews"]["invalidated_comparisons"], 1)

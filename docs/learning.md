@@ -4,7 +4,7 @@ Three different learning loops must remain distinguishable:
 
 1. **Personalization**: an explicit profile preference snapshot changes prompts; a reviewed score changes that profile's routing prior for a specific format/stage and model signature. Execution measurements inform conservative latency estimates and smoothed reliability within the same scope. Changing the backend or generation limits isolates its history. No cross-profile or cross-task feedback sharing. These estimates are heuristics, not measured proof of the best creative model.
 2. **Technique updates**: subscribed public feed collection → deduplicated, versioned research inbox → human-reviewed evidence and editorial guidance → experimental runs → paired review → activation → possible rollback. Feed revisions do not rewrite a proposed technique's frozen evidence.
-3. **Creator development**: `coach` produces medium-specific review questions and a deliberate-revision exercise bound to actual artifacts. `practice` retains a changed revision, original hash, rubric dimension, before/after scores and a rationale. `progress` aggregates self-reported revision deltas per profile. These records support reflection, but do not prove that users become more skilled.
+3. **Creator development**: `coach` produces medium-specific review questions and a deliberate-revision exercise bound to actual artifacts. `practice` retains a changed revision, original hash, rubric dimension, before/after scores and a rationale. `progress` aggregates self-reported revision deltas per profile, separately from the [blind revision comparison](practice-review.md) summaries. These records support reflection, but do not prove that users become more skilled.
 
 ## Paired review file
 

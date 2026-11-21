@@ -44,7 +44,8 @@ This is a delivery backlog, not a promise that the complete product is already a
 - [x] CLI task-isolated A/B review protocol, preassigned holdout briefs and explicit holdout-only quality calibration (synthetic protocol verification).
 - [ ] Independently conducted real-provider blind reviews and budget-matched comparisons.
 - [ ] Outcome-based model calibration, fallback decisions and auditable cost accounting.
-- [ ] Evidence of creator skill improvement through exercises and independently scored revisions.
+- [x] Artifact-bound A/B text-revision reviews, immutable ratings and separate self/externally-declared summaries (synthetic protocol and HTTP verified).
+- [ ] Independent reviewer identity/assignment, transfer tasks and evidence of durable creator skill improvement.
 - [ ] Publish reproducible evaluations; no claim of an industry benchmark before comparative evidence exists.
 
 ## Delivery integrations

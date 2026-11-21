@@ -38,6 +38,11 @@ class Store:
                   before_score REAL NOT NULL, after_score REAL NOT NULL,
                   rationale TEXT NOT NULL, artifact TEXT NOT NULL,
                   created TEXT DEFAULT CURRENT_TIMESTAMP);
+                CREATE TABLE IF NOT EXISTS practice_reviews (
+                  id TEXT PRIMARY KEY, practice_id TEXT NOT NULL UNIQUE,
+                  binding TEXT NOT NULL, display_order TEXT NOT NULL,
+                  scores TEXT, reviewer_kind TEXT, rationale TEXT,
+                  created TEXT DEFAULT CURRENT_TIMESTAMP);
                 CREATE TABLE IF NOT EXISTS measurements (
                   run_id TEXT NOT NULL, step_id TEXT NOT NULL, profile TEXT NOT NULL,
                   task TEXT NOT NULL, model TEXT NOT NULL, signature TEXT NOT NULL,

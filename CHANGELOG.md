@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.13.0
+
+- Add immutable, hash-bound A/B comparisons for saved UTF-8 text practice revisions, with randomized presentation and neutral-timestamp review packets that exclude previous self-scores, editing rationale and version mappings.
+- Preserve direct shared text inputs, authorized source context and public credits for meaningful review. Verify source/revision integrity before packet export, scoring, report and aggregation.
+- Separate self reviews from externally declared reviews in growth summaries; invalidate changed/missing artifact comparisons rather than silently counting them. External reviewer identity/independence is not verified.
+- Connect the flow to the workbench growth view and CLI with authenticated previews and immutable scoring. No practice scores enter model routing feedback.
+- Add synthetic revision/reviewer and real HTTP tests. Revision-quality deltas are not causal evidence of durable creator skill gains, and browser acceptance remains pending.
+
 ## 0.12.0
 
 - Add model-assisted public-feed synthesis with frozen evidence revisions, exact quotation validation, explicit insufficient-evidence results and structured original experiment briefs. Sources remain untrusted data; no code/tools or full-paper reading is implied.

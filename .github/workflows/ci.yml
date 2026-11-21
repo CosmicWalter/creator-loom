@@ -20,6 +20,7 @@ jobs:
       - run: node --check creator_loom/static/timeline.js
       - run: node --check creator_loom/static/media.js
       - run: node --check creator_loom/static/lab.js
+      - run: node --check creator_loom/static/practice.js
       - run: node --check website/app.js
       - run: python scripts/check_website.py
       - run: python -m pip wheel . --no-deps --wheel-dir dist
