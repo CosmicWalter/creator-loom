@@ -21,11 +21,13 @@ This is a delivery backlog, not a promise that the complete product is already a
 - [x] Task-specific quality priors, feedback isolation by backend signature, observed reliability and conservative latency.
 - [x] Reserve upstream output bounds against downstream input capacity in joint allocation.
 - [ ] Calibrate model priors and quality dimensions using reviewed real-provider creative tasks and actual billing evidence.
-- [ ] Voice selection/authorization, subtitle timings, dynamic covers, clips and audio mixing.
+- [x] Authorized reference-voice selection and local CLI timeline with reviewed cuts, still-image zoom, explicit subtitle timing and narration/music mixing.
+- [ ] Automatic speech alignment, ducking/loudness controls, transitions and generative video delivery.
 - [x] MediaFlow narration adapter with frozen segment requests, persistent remote IDs, safe polling/download recovery and explicit reconciliation.
 - [ ] ComfyUI adapter, MediaFlow transcription delivery and additional asynchronous model providers.
 - [x] Bounded TXT/unencrypted EPUB import, chapter/unit provenance and reviewed sequential creation with frozen continuity notes.
-- [ ] Rich character memory, automatic continuity proposals, editable timeline and shot-level review.
+- [x] Versioned CLI edit lists, per-shot review, sealed rendering and final approval over hash-bound sources.
+- [ ] Rich character memory, automatic continuity proposals and a workbench timeline editor.
 - [x] Authenticated loopback workbench, frozen plan confirmation, artifact preview/review and structured deliverable export.
 - [x] Workbench book import, sequential creation, research inbox and text revision practice backed by existing APIs.
 - [ ] Browser interaction/visual acceptance and further usability iteration; generalized media asset library and timeline editing.
@@ -47,3 +49,9 @@ This is a delivery backlog, not a promise that the complete product is already a
 - [ ] Optional publishing adapters with isolated credentials and explicit final approval.
 - [ ] Real platform receipts; indeterminate submissions must not be replayed.
 - [ ] Team permissions, quotas, retention/export/delete and production operations before multi-user hosting.
+
+## Public experience and music workflows
+
+- [ ] Publish a responsive project website to this repository's GitHub Pages with accurate capability boundaries and usable onboarding.
+- [ ] Friendly workbench timeline editing and verified browser/mobile interaction flows.
+- [ ] Rights-aware Suno adaptation workflow, explicit human handoff and verified receipt/import boundaries.

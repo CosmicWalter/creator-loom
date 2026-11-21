@@ -89,6 +89,17 @@ class Store:
                 CREATE TABLE IF NOT EXISTS web_actions (
                   id TEXT PRIMARY KEY, run_id TEXT NOT NULL, operation TEXT NOT NULL,
                   status TEXT NOT NULL, error TEXT);
+                CREATE TABLE IF NOT EXISTS timelines (
+                  id TEXT PRIMARY KEY, current_version INTEGER NOT NULL,
+                  created TEXT DEFAULT CURRENT_TIMESTAMP);
+                CREATE TABLE IF NOT EXISTS timeline_versions (
+                  timeline_id TEXT NOT NULL, version INTEGER NOT NULL, spec TEXT NOT NULL,
+                  state TEXT NOT NULL, outputs TEXT, created TEXT DEFAULT CURRENT_TIMESTAMP,
+                  PRIMARY KEY(timeline_id,version));
+                CREATE TABLE IF NOT EXISTS shot_reviews (
+                  timeline_id TEXT NOT NULL, version INTEGER NOT NULL, shot_id TEXT NOT NULL,
+                  decision TEXT NOT NULL, note TEXT NOT NULL, created TEXT DEFAULT CURRENT_TIMESTAMP,
+                  PRIMARY KEY(timeline_id,version,shot_id));
                 CREATE TABLE IF NOT EXISTS benchmarks (
                   id TEXT PRIMARY KEY, protocol TEXT NOT NULL, state TEXT NOT NULL,
                   report TEXT, created TEXT DEFAULT CURRENT_TIMESTAMP);

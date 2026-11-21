@@ -7,6 +7,7 @@ import sys
 import time
 from pathlib import Path
 
+from .timeline import Timeline
 from .benchmarks import Benchmarks
 from .domain import Brief, RECIPES, identifier
 from .coaching import Coach
@@ -182,6 +183,24 @@ def main(argv=None):
             p.add_argument("--a", type=float, required=True)
             p.add_argument("--b", type=float, required=True)
             p.add_argument("--rationale", required=True)
+    for command in ["timeline-new", "timeline-revise"]:
+        p = sub.add_parser(command)
+        p.add_argument("id")
+        p.add_argument("--spec", type=Path, required=True)
+        if command == "timeline-revise":
+            p.add_argument("--base-version", type=int, required=True)
+    for command in ["timeline-inspect", "timeline-export"]:
+        p = sub.add_parser(command)
+        p.add_argument("id")
+        p.add_argument("--version", type=int)
+    for command in ["timeline-shot", "timeline-seal", "timeline-render", "timeline-approve"]:
+        p = sub.add_parser(command)
+        p.add_argument("id")
+        p.add_argument("--base-version", type=int, required=True)
+        if command == "timeline-shot":
+            p.add_argument("shot")
+            p.add_argument("--decision", choices=["approve", "reject"], required=True)
+            p.add_argument("--note", required=True)
     args = parser.parse_args(argv)
     try:
         store = Store(args.data)
@@ -192,7 +211,20 @@ def main(argv=None):
         library = Library(store)
         series = Series(store, engine)
         research = Research(store, learning)
-        if args.command.startswith("benchmark-"):
+        if args.command.startswith("timeline-"):
+            timeline = Timeline(store)
+            action = args.command.removeprefix("timeline-")
+            if action == "new":
+                emit(timeline.create(args.id, json.loads(args.spec.read_text())))
+            elif action == "revise":
+                emit(timeline.revise(args.id, json.loads(args.spec.read_text()), args.base_version))
+            elif action == "shot":
+                emit(timeline.review_shot(args.id, args.shot, args.base_version, args.decision, args.note))
+            elif action in {"inspect", "export"}:
+                emit(getattr(timeline, action)(args.id, args.version))
+            else:
+                emit(getattr(timeline, {"seal": "seal", "render": "render", "approve": "approve"}[action])(args.id, args.base_version))
+        elif args.command.startswith("benchmark-"):
             benchmarks = Benchmarks(store, cards)
             action = args.command.removeprefix("benchmark-")
             if action == "new":

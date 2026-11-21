@@ -1,0 +1,29 @@
+{
+  "title": "An original reading moment",
+  "width": 1280,
+  "height": 720,
+  "fps": 24,
+  "shots": [
+    {
+      "id": "opening",
+      "source": {"run": "APPROVED_COVER_RUN", "step": "cover", "file": "cover/cover.ppm"},
+      "duration": 3,
+      "motion": "zoom-in"
+    },
+    {
+      "id": "closing",
+      "source": {"run": "APPROVED_VIDEO_RUN", "step": "film", "file": "film/film.mp4"},
+      "in": 1,
+      "duration": 3
+    }
+  ],
+  "narration": {
+    "source": {"run": "APPROVED_NARRATION_RUN", "step": "narration", "file": "narration/narration.wav"},
+    "gain": 1
+  },
+  "music": null,
+  "captions": [
+    {"start": 0, "end": 3, "text": "An original reading moment."},
+    {"start": 3, "end": 6, "text": "A story continues through another shot."}
+  ]
+}

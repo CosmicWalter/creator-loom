@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.0
+
+- Add a versioned local timeline CLI over approved artifacts, with immutable shot decisions, explicit edit sealing, OS execution locks and final film approval before export.
+- Render real multi-shot cuts, trimmed video clips, centered still-image zoom, narration/music mixing, optional looping and selectable MP4 subtitles with SRT delivery.
+- Bind source/output hashes throughout editing and delivery. Preserve old revisions, reject stale edits, exclude raw source paths and operation records from neutral-timestamp exports, and drop inherited container metadata.
+- Add actual decoded-frame, frequency, stream, duration and metadata checks using original synthetic media and real FFmpeg. No live model-quality or browser acceptance claims.
+
 ## 0.8.0
 
 - Add CLI task-isolated model comparisons with frozen plans, preassigned development/holdout briefs and randomized A/B presentation. Candidate targets reuse the baseline's exact upstream artifacts.

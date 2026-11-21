@@ -4,10 +4,10 @@ Reviewed 2026-11-21 against primary project documentation. This is a capability/
 
 | Project | Documented strength | Lesson for Creator Loom | Current gap here |
 | --- | --- | --- | --- |
-| [MoneyPrinterTurbo](https://github.com/harry0703/MoneyPrinterTurbo) | Topic/keyword-driven automated short-video production | Make a useful end-to-end creative outcome the entry point | Our output is only a static-image narration video; no stock-media assembly |
+| [MoneyPrinterTurbo](https://github.com/harry0703/MoneyPrinterTurbo) | Topic/keyword-driven automated short-video production | Make a useful end-to-end creative outcome the entry point | Recipe output remains static-image narration; a reviewed local cut/zoom timeline exists, without stock discovery |
 | [ComfyUI](https://github.com/Comfy-Org/ComfyUI) | Reusable node graphs for image, video, audio and other modalities; local inference and APIs | Preserve reproducible generation parameters; connect to existing engines | No ComfyUI queue adapter, workflow import, references or model management yet |
 | [LangGraph](https://docs.langchain.com/oss/python/langgraph/overview) | Stateful orchestration, persistence, durable execution and human intervention | Make state, uncertainty and human review explicit | Current runtime has basic durable state but not a full checkpoint/resume framework |
-| [Dify](https://github.com/langgenius/dify) | Visual workflows, model management, RAG, observability and annotations | Separate experimentation from production, retain review evidence | CLI only; no visual composer, RAG or team collaboration |
+| [Dify](https://github.com/langgenius/dify) | Visual workflows, model management, RAG, observability and annotations | Separate experimentation from production, retain review evidence | Authenticated local workbench and CLI; no visual workflow composer, RAG or team collaboration |
 
 ## Our intended contribution
 
