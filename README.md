@@ -2,6 +2,8 @@
 
 **An open content creation agent that explains its choices and learns from reviewed outcomes.**
 
+[项目官网](https://cosmicwalter.github.io/creator-loom/) · [本机工作台](docs/workbench.md) · [路线图](ROADMAP.md)
+
 面向文字、图片、音频、视频的开源创作 Agent。目标是把创作、模型决策、个人偏好和技术迭代放进一个可检查的闭环，让作品和创作者一起进步。
 
 **状态：早期可运行原型，不是已经达到行业标杆的成品。** Python 3.11+，核心零运行时依赖，MIT 开源。提供 CLI 和仅本机访问的网页工作台；尚无平台投稿、通用自主工具执行或自动训练模型权重。

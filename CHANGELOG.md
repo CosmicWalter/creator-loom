@@ -2,6 +2,7 @@
 
 ## 0.9.0
 
+- Add a responsive buildless public website with explicitly illustrative workflow exploration, local installation onboarding and capability/roadmap boundaries. Publish through an identity-checked, allowlisted `gh-pages` branch; browser acceptance remains pending.
 - Add a versioned local timeline CLI over approved artifacts, with immutable shot decisions, explicit edit sealing, OS execution locks and final film approval before export.
 - Render real multi-shot cuts, trimmed video clips, centered still-image zoom, narration/music mixing, optional looping and selectable MP4 subtitles with SRT delivery.
 - Bind source/output hashes throughout editing and delivery. Preserve old revisions, reject stale edits, exclude raw source paths and operation records from neutral-timestamp exports, and drop inherited container metadata.
