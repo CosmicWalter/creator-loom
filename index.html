@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Creator Loom 是一个面向文字、图像、声音与视频的开源创作基座。让模型选择可解释，让学习来自审核，让每次创作都有迹可循。">
+  <meta name="theme-color" content="#132b29">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Creator Loom · 把想法织成作品</title>
+  <link rel="icon" type="image/svg+xml" href="mark.svg">
+  <link rel="stylesheet" href="style.css">
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <a class="skip" href="#main">跳到正文</a>
+  <header class="header wrap">
+    <a class="brand" href="#" aria-label="Creator Loom 首页"><img src="mark.svg" width="36" height="36" alt=""><span>Creator <strong>Loom</strong></span></a>
+    <nav aria-label="主导航"><a href="#studio">创作方式</a><a href="#learning">学习闭环</a><a href="#status">开发进展</a><a href="https://github.com/CosmicWalter/creator-loom" class="source">GitHub <span aria-hidden="true">⌘</span></a></nav>
+  </header>
+  <main id="main">
+    <section class="hero wrap">
+      <div class="hero-copy">
+        <p class="eyebrow"><span class="seed" aria-hidden="true"></span> OPEN SOURCE CREATIVE FOUNDATION</p>
+        <h1>把一个想法，<br>织成<span class="ink">下一件作品。</span></h1>
+        <p class="lead">文字、图像、声音与视频，一个可检查的创作工作流。<br class="desktop">模型为什么这样选，作品如何变得更好，每一步都看得见。</p>
+        <div class="hero-actions"><a class="button dark" href="#start">开始本机创作</a><a class="text-link" href="https://github.com/CosmicWalter/creator-loom#readme">阅读使用指南</a></div>
+        <p class="release"><span class="release-tag">v0.9.0</span> 开放开发中 <span aria-hidden="true">·</span> MIT 许可 <span aria-hidden="true">·</span> Python 3.11+</p>
+      </div>
+      <div class="loom-art" aria-label="从创作要求，经过计划、制作与审核，成为文字、图像、声音与视频的示意图" role="img">
+        <div class="art-grain"></div><div class="art-grid"></div>
+        <div class="thread thread-a"></div><div class="thread thread-b"></div><div class="thread thread-c"></div>
+        <div class="art-note note-top"><span class="tiny">THE STARTING POINT</span><strong>一个值得讲述的想法</strong><span class="note-line"></span><span class="note-line short"></span></div>
+        <div class="weave"><div class="weave-cross cross-a"></div><div class="weave-cross cross-b"></div><div class="weave-cross cross-c"></div><span>loom</span><small>CREATE · REVIEW · EVOLVE</small></div>
+        <div class="format-chip chip-text"><span>文</span> 文字</div><div class="format-chip chip-image"><span>◒</span> 图像</div><div class="format-chip chip-audio"><span>≋</span> 声音</div><div class="format-chip chip-video"><span>▷</span> 视频</div>
+        <div class="art-caption"><span>让灵感有去处，让进步有依据。</span><span aria-hidden="true">✳</span></div>
+      </div>
+    </section>
+    <div class="principles"><div class="wrap"><p>你的创作，<strong>由你掌握。</strong></p><span>本机工作台</span><span>自己的模型</span><span>明确的审核</span><span>可编辑的交付</span></div></div>
+    <section id="studio" class="studio wrap section">
+      <div class="section-head"><div><p class="eyebrow">ONE IDEA, MANY MEDIUMS</p><h2>从你想做的作品开始。</h2></div><p>先说清楚想表达什么，<br>再为每一步选择合适的工具。</p></div>
+      <div class="demo-shell">
+        <div class="demo-tabs" role="tablist" aria-label="探索创作流程">
+          <button role="tab" id="tab-story" aria-selected="true" aria-controls="demo-panel" data-demo="story">有声故事</button>
+          <button role="tab" id="tab-writing" aria-selected="false" aria-controls="demo-panel" tabindex="-1" data-demo="writing">文章与小说</button>
+          <button role="tab" id="tab-visual" aria-selected="false" aria-controls="demo-panel" tabindex="-1" data-demo="visual">图像与图文</button>
+          <button role="tab" id="tab-edit" aria-selected="false" aria-controls="demo-panel" tabindex="-1" data-demo="edit">多镜头剪辑</button>
+        </div>
+        <div class="demo-body" id="demo-panel" role="tabpanel" aria-labelledby="tab-story" tabindex="0">
+          <div class="demo-brief"><p class="eyebrow" id="demo-kind">有声故事 · BOOKCAST</p><h3 id="demo-title">让灯塔的故事，<br>被听见，也被看见。</h3><p id="demo-description">把已授权的章节变成口播稿、封面、配音和视频。上下文与连续性说明随计划保存，审核后再进入下一集。</p><a class="text-link" id="demo-doc" href="https://github.com/CosmicWalter/creator-loom/blob/main/docs/books-and-series.md">了解连续创作</a><small>流程演示 · 本页不调用模型或保存创作内容</small></div>
+          <div class="demo-stage"><div class="demo-topline"><span>创作计划</span><span class="mini-label">先预览，再制作</span></div><ol class="workflow" id="demo-steps"><li><span>文稿改编</span><small>文字模型 · 任务与来源</small></li><li><span>封面设计</span><small>图像模型或本地图形工具</small></li><li><span>生成旁白</span><small>语音服务 · 音色授权</small></li><li><span>视频合成</span><small>本机 FFmpeg · 审核交付</small></li></ol><div class="demo-boundary" id="demo-boundary">当前配方输出静态配图视频；多镜头剪辑通过 CLI 时间线完成。</div></div>
+        </div>
+      </div>
+    </section>
+    <section class="decisions wrap section">
+      <div class="decision-art" aria-hidden="true"><div class="decision-request">任务：小说章节改编<span>语言 · 输入容量 · 隐私 · 预算</span></div><div class="decision-rail"></div><div class="model-row"><span>文字模型 A</span><span>可用</span></div><div class="model-row"><span>文字模型 B</span><span>可用</span></div><div class="decision-choice"><span>共同分配整个工作流</span><strong>检查约束，解释选择。</strong><span class="example-label">机制示意，未展示实测排名</span></div></div>
+      <div class="decision-copy"><p class="eyebrow">CHOICES YOU CAN INSPECT</p><h2>合适的模型，<br>用在具体的任务上。</h2><p>先检查能力、语言、隐私、输入容量，以及配置中的费用与时延估计。再结合任务评分与已记录的运行结果，分配整个工作流。</p><p>每项选择都保留理由。不同后端的评分相互隔离；留出集评审需要经过封存、产物审核和显式校准，才进入后续质量反馈。</p><a class="text-link" href="https://github.com/CosmicWalter/creator-loom/blob/main/docs/model-decisions.md">查看模型决策机制</a></div>
+    </section>
+    <section id="learning" class="learning section">
+      <div class="wrap"><div class="section-head"><div><p class="eyebrow">LEARN THROUGH MAKING</p><h2>下一次创作，<br>从这一次的复盘开始。</h2></div><p>让新技术经过验证，<br>让修改留下值得学习的理由。</p></div>
+      <div class="learning-grid"><article><span class="learning-symbol" aria-hidden="true">◎</span><h3>发现，再判断</h3><p>订阅公开 RSS/Atom 来源，去重并保留证据版本。你审核的指导建议才会成为待评估的技术提案。</p><a href="https://github.com/CosmicWalter/creator-loom/blob/main/docs/research-inbox.md">研究收件箱</a></article><article><span class="learning-symbol" aria-hidden="true">◐</span><h3>对照，再采用</h3><p>冻结比较条件，进行配对评审。技术建议通过评估后才能激活，并保留回滚记录；模型对照独立保留开发集与留出集。</p><a href="https://github.com/CosmicWalter/creator-loom/blob/main/docs/benchmarks.md">评测与校准</a></article><article><span class="learning-symbol" aria-hidden="true">✳</span><h3>修改，也练习</h3><p>围绕清晰度、结构、节奏与媒介要求检查作品。保存实际改稿、评分和理由，逐步形成自己的编辑判断。</p><a href="https://github.com/CosmicWalter/creator-loom/blob/main/docs/learning.md">创作者练习</a></article></div>
+      <p class="learning-note">目前的成长记录以用户自评为主；尚无独立证据证明创作者技能提升，也不宣称系统会自动训练模型或自主修改代码。</p></div>
+    </section>
+    <section id="start" class="start wrap section">
+      <div class="start-copy"><p class="eyebrow">YOUR LOCAL CREATIVE SPACE</p><h2>把工作台，<br>放回你的电脑。</h2><p>核心没有第三方 Python 运行时依赖。先用无需密钥的本地图形封面熟悉流程，再接入自己的模型服务。视频制作另需 FFmpeg/FFprobe。</p><p>官网只介绍项目。真正的创作在本机访问码保护的工作台中进行；不在这里填写密钥、上传稿件或连接私人账号。</p><a class="text-link" href="https://github.com/CosmicWalter/creator-loom/blob/main/docs/workbench.md">工作台使用说明</a></div>
+      <div class="terminal"><div class="terminal-bar"><span>安装与启动</span><button id="copy-install" type="button">复制命令</button></div><pre><code id="install-command">git clone https://github.com/CosmicWalter/creator-loom.git
+cd creator-loom
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install -e .
+loom serve --open</code></pre><div class="terminal-foot"><span>在终端中运行 · macOS / Linux 示例</span><a href="https://github.com/CosmicWalter/creator-loom#readme">其他使用方式</a></div><p id="copy-status" class="copy-status" role="status" aria-live="polite"></p></div>
+    </section>
+    <section id="status" class="status wrap section">
+      <div class="section-head"><div><p class="eyebrow">BUILDING IN THE OPEN</p><h2>认真做作品，也如实说进展。</h2></div><a class="text-link" href="https://github.com/CosmicWalter/creator-loom/blob/main/ROADMAP.md">完整路线图</a></div>
+      <div class="status-table"><div><h3>现在可以使用</h3><p>七种创作配方、本机工作台、书籍与连续作品、研究收件箱、创作者修改练习、模型对照 CLI，以及镜头审核与多镜头剪辑 CLI。</p><span class="status-label shipped">已实现 · 见文档边界</span></div><div><h3>仍需要真实验证</h3><p>真实供应商与创作质量对照、独立评审的技能收益、浏览器与移动端交互验收。现有模拟测试不构成这些能力的证据。</p><span class="status-label">待验证</span></div><div><h3>接下来一起建设</h3><p>网页时间线、丰富角色记忆、ComfyUI 接入、Suno 改编与授权素材导入，以及带明确最终批准的平台发布。</p><span class="status-label">路线图 · 尚未交付</span></div></div>
+    </section>
+    <section class="closing wrap"><span class="closing-mark" aria-hidden="true">✳</span><h2>作品继续生长，<br>工具也应该如此。</h2><p>带着你的创作场景、问题和可复现的反馈，一起把基座做扎实。</p><div class="hero-actions"><a class="button dark" href="https://github.com/CosmicWalter/creator-loom">参与开源项目</a><a class="text-link" href="https://github.com/CosmicWalter/creator-loom/issues">查看与提交问题</a></div></section>
+  </main>
+  <footer class="footer wrap"><a class="brand" href="#"><img src="mark.svg" width="28" height="28" alt=""><span>Creator <strong>Loom</strong></span></a><p>由 CosmicWalter 开源维护 · MIT License</p><div><a href="https://github.com/CosmicWalter/creator-loom/blob/main/LICENSE">许可</a><a href="https://github.com/CosmicWalter/creator-loom">源码</a></div></footer>
+</body>
+</html>
