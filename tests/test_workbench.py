@@ -14,6 +14,8 @@ import unittest
 import uuid
 import zipfile
 from pathlib import Path
+from contextlib import closing
+import wave
 from unittest.mock import patch
 
 from creator_loom import adapters
@@ -387,7 +389,7 @@ class WorkbenchTest(unittest.TestCase):
 
     def test_timeline_legacy_profile_migration_and_non_replayed_actions(self):
         with tempfile.TemporaryDirectory() as temporary:
-            with sqlite3.connect(Path(temporary)/"loom.sqlite3") as db:
+            with closing(sqlite3.connect(Path(temporary)/"loom.sqlite3")) as db, db:
                 db.execute("CREATE TABLE timelines(id TEXT PRIMARY KEY,current_version INTEGER NOT NULL,created TEXT DEFAULT CURRENT_TIMESTAMP)")
                 db.execute("INSERT INTO timelines(id,current_version) VALUES('legacy',1)")
             migrated = Store(Path(temporary))
@@ -421,3 +423,82 @@ class WorkbenchTest(unittest.TestCase):
         self.assertEqual(old["actions"][0]["status"], "error")
         with self.store.connect() as db:
             self.assertIsNone(db.execute("SELECT outputs FROM timeline_versions WHERE timeline_id='edit' AND version=2").fetchone()[0])
+
+    def media_audio(self, origin=None, key=None):
+        stream = io.BytesIO()
+        with wave.open(stream, "wb") as audio:
+            audio.setparams((1, 2, 48000, 0, "NONE", "not compressed"))
+            audio.writeframes(b"\0\0"*24000)
+        metadata = {"title": "Original HTTP audio fixture", "kind": "audio", "rights": "owned", "rights_note": "Original synthetic audio, authorized for fixture reuse.", "authorized": True, "profile": "default"}
+        if origin:
+            metadata["origin"] = origin
+        body = {"data": base64.b64encode(stream.getvalue()).decode(), "metadata": metadata}
+        request_key = key or uuid.uuid4().hex
+        return self.api("POST", "/api/assets", body, {"Idempotency-Key": request_key}), body, request_key
+
+    @unittest.skipUnless(shutil.which("ffmpeg") and shutil.which("ffprobe"), "FFmpeg/FFprobe required")
+    def test_authorized_media_http_import_review_and_timeline_sources(self):
+        self.login()
+        asset, body, key = self.media_audio()
+        repeated = self.api("POST", "/api/assets", body, {"Idempotency-Key": key})
+        self.assertEqual(asset["id"], repeated["id"])
+        media_path = f"/api/assets/{asset['id']}/media"
+        self.assertEqual(self.request("GET", media_path, auth=False)[0], 401)
+        self.assertEqual(self.request("GET", media_path, headers={"Origin": "https://example.com"})[0], 403)
+        self.assertEqual(self.request("GET", f"/api/assets/{asset['id']}/export")[0], 409)
+        self.assertFalse(any(a["ref"].get("asset") == asset["id"] for a in self.api("GET", "/api/timeline-assets")["assets"]))
+        self.api("POST", f"/api/assets/{asset['id']}/review", {"decision": "approve", "note": "Actual audio and source rights checked."})
+        source = next(a for a in self.api("GET", "/api/timeline-assets")["assets"] if a["ref"].get("asset") == asset["id"])
+        info = self.api("GET", "/api/timeline-assets/"+source["key"])
+        self.assertEqual(info["kind"], "audio")
+        self.assertAlmostEqual(info["duration"], 0.5)
+        status, headers, raw = self.request("GET", info["preview"], headers={"Range": "bytes=0-15"})
+        self.assertEqual(status, 206)
+        self.assertTrue(raw.startswith(b"RIFF"))
+        status, headers, raw = self.request("GET", f"/api/assets/{asset['id']}/export")
+        self.assertEqual(status, 200)
+        with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+            self.assertEqual(set(archive.namelist()), {"audio.wav", "credits.json"})
+            self.assertNotIn("rights_note", archive.read("credits.json").decode())
+        body["metadata"]["authorized"] = False
+        self.assertEqual(self.request("POST", "/api/assets", body, {"Idempotency-Key": uuid.uuid4().hex})[0], 409)
+        self.assertEqual(self.request("POST", "/api/assets", {}, {"Content-Length": str(46*1024*1024+1)})[0], 413)
+        _, path = self.server.app.assets.verify(asset["id"])
+        path.write_bytes(b"changed")
+        self.assertEqual(self.request("GET", media_path)[0], 409)
+
+    @unittest.skipUnless(shutil.which("ffmpeg") and shutil.which("ffprobe"), "FFmpeg/FFprobe required")
+    def test_music_http_plan_explicit_handoff_and_reported_result_adoption(self):
+        self.login()
+        source, _, _ = self.media_audio()
+        self.api("POST", f"/api/assets/{source['id']}/review", {"decision": "approve", "note": "Original source and reuse checked."})
+        self.server.app.cards.append(ModelCard("music-writer", "text", "chat", model="fixture", local=True, endpoint="http://127.0.0.1:8765/v1", max_chars=30000))
+        spec = {"title": "Original music brief", "intent": "Create a gentle original lyric and arrangement direction.", "lyrics": "A quiet lantern by the sea.", "lyrics_rights": "owned", "rights_note": "Original test text and authorized synthetic audio.", "adaptation_authorized": True, "source": {"asset": source["id"]}}
+        key = uuid.uuid4().hex
+        project = self.api("POST", "/api/music", {"id": "music-fixture", "spec": spec}, {"Idempotency-Key": key})
+        self.assertEqual(self.api("POST", "/api/music", {"id": "music-fixture", "spec": spec}, {"Idempotency-Key": key})["run_id"], project["run_id"])
+        self.assertEqual(self.request("GET", "/api/music/music-fixture/handoff")[0], 409)
+        def fake_text(card, prompt, dependencies, directory, key=""):
+            directory.mkdir(parents=True, exist_ok=True)
+            path = directory/"content.md"; path.write_text("Original simulated music planning text."); return path
+        with patch.object(adapters, "execute", fake_text):
+            self.run_action(project["run_id"])
+        self.api("POST", f"/api/runs/{project['run_id']}/approve", {})
+        decision = {"transfer_authorized": False, "include_audio": True, "note": "Authorize exactly this reference for the local package."}
+        self.assertEqual(self.request("POST", "/api/music/music-fixture/handoff", decision)[0], 409)
+        decision["transfer_authorized"] = True
+        self.api("POST", "/api/music/music-fixture/handoff", decision)
+        status, headers, raw = self.request("GET", "/api/music/music-fixture/handoff")
+        self.assertEqual(status, 200)
+        with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+            self.assertIn("reference.wav", archive.namelist())
+            self.assertNotIn("rights_note", archive.read("brief.json").decode())
+        reference = "https://suno.com/song/12345678-1234-1234-1234-123456789abc"
+        external = self.api("POST", "/api/music/music-fixture/external", {"reference": reference, "note": "Operator reports this external result, without API proof."})
+        self.assertIn("not verified", external["external"]["evidence"])
+        result, _, _ = self.media_audio({"service": "suno", "reference": reference})
+        self.assertEqual(self.request("POST", "/api/music/music-fixture/attach", {"asset": result["id"], "note": "Unreviewed audio cannot be adopted."})[0], 409)
+        self.api("POST", f"/api/assets/{result['id']}/review", {"decision": "approve", "note": "Actual audio, credits and rights checked."})
+        attached = self.api("POST", "/api/music/music-fixture/attach", {"asset": result["id"], "note": "Reviewed local result adopted for this brief."})
+        self.assertEqual(attached["state"], "result_attached")
+        self.assertIn("operator-reported", attached["result"]["evidence"])

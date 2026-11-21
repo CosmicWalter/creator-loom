@@ -10,6 +10,7 @@ const state = {
 const watchedActions = new Set();
 const formats = {
   article: "文章",
+  song: "歌词与音乐方案",
   novel: "小说改编",
   cover: "本地图形封面",
   podcast: "播客口播",
@@ -28,6 +29,9 @@ const statuses = {
 };
 const stages = {
   draft: "文章",
+  lyrics: "歌词方案",
+  direction: "音乐方向",
+  imported: "授权导入",
   outline: "故事大纲",
   chapter: "章节正文",
   script: "口播文稿",
@@ -205,6 +209,7 @@ async function navigate(view) {
       runs: "作品档案",
       books: "我的书架",
       timelines: "剪辑台",
+      assets: "素材与音乐",
       research: "学习雷达",
       growth: "成长记录",
     }[view] || "作品详情");
@@ -216,6 +221,7 @@ async function navigate(view) {
   if (view === "research") await researchView();
   if (view === "growth") growthView();
   if (view === "timelines") await timelineView();
+  if (view === "assets") await mediaView();
 }
 function workCard(run) {
   const card = node("button", "work-card");
@@ -1170,13 +1176,15 @@ $(".brand").onclick = (e) => {
 $("#refresh").onclick = () =>
   state.view === "detail"
     ? openRun(state.run).catch((e) => toast(e.message))
+    : state.view === "music-detail"
+      ? openMusic(mediaUI.project).catch(e => toast(e.message))
     : state.view === "timeline-detail"
       ? (timelineUI.loaded ? openTimeline(timelineUI.loaded.id, timelineUI.loaded.version) : navigate("timelines")).catch(e => toast(e.message))
       : state.view === "timeline-edit"
         ? renderTimelineEditor()
         : navigate(state.view).catch((e) => toast(e.message));
 $("#profile").onchange = () =>
-  navigate(state.view === "detail" ? "runs" : state.view.startsWith("timeline") ? "timelines" : state.view).catch((e) =>
+  navigate(state.view === "detail" ? "runs" : state.view.startsWith("timeline") ? "timelines" : state.view === "music-detail" ? "assets" : state.view).catch((e) =>
     toast(e.message),
   );
 document

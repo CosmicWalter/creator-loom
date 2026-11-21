@@ -65,7 +65,7 @@ def check(root=ROOT):
     for tab in page.tabs:
         if tab.get("aria-controls") not in page.ids:
             raise ValueError("Tab panel is missing")
-    if len(page.tabs) != 4 or sum(t.get("aria-selected") == "true" for t in page.tabs) != 1:
+    if len(page.tabs) != 5 or sum(t.get("aria-selected") == "true" for t in page.tabs) != 1:
         raise ValueError("Invalid initial tab state")
     version = tomllib.loads((root/"pyproject.toml").read_text())["project"]["version"]
     if f">v{version}<" not in html:

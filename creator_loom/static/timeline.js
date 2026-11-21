@@ -10,10 +10,15 @@ function timelineDirty() {
 function timelineNumber(value, min = 0, max = 600, step = "any") {
   const n = input(value, "number"); n.min = min; n.max = max; n.step = step; n.required = true; return n;
 }
-function timelineRefKey(ref) { return JSON.stringify([ref.run, ref.step, ref.file, ref.sha256]); }
+function timelineRefKey(ref) { return JSON.stringify(ref.asset ? ["asset", ref.asset, ref.sha256] : [ref.run, ref.step, ref.file, ref.sha256]); }
+function timelineVideo(ref) { return ref.kind === "video" || Boolean(ref.file?.endsWith(".mp4")); }
 async function timelineAsset(ref) {
   const found = timelineUI.assets.find(a => timelineRefKey(a.ref) === timelineRefKey(ref));
   if (found) return found;
+  if (ref.asset) {
+    const asset = await api("/api/assets/" + ref.asset);
+    return { key: "asset/" + asset.id, ref, title: asset.payload.title, kind: asset.payload.kind };
+  }
   const key = timelineRefKey(ref);
   if (!timelineUI.cache.has(key)) timelineUI.cache.set(key, (async () => {
     const run = await api("/api/runs/" + ref.run), step = run.steps.find(s => s.id === ref.step);
@@ -63,7 +68,8 @@ async function timelineView() {
   }, "primary"));
   if (timelineUI.draft?.profile === state.profile) tools.append(button("继续未保存的剪辑", renderTimelineEditor));
   root.append(tools);
-  if (sources.unavailable_runs) root.append(node("p", "mini-note", `${sources.unavailable_runs} 份源作品缺失或变化，已暂不列入素材选择。`));
+  const unavailable = (sources.unavailable_runs || 0) + (sources.unavailable_assets || 0);
+  if (unavailable) root.append(node("p", "mini-note", `${unavailable} 份源作品或导入素材缺失或变化，已暂不列入素材选择。`));
   const cards = node("div", "cards");
   for (const timeline of timelines) {
     const card = button("", () => openTimeline(timeline.id), "work-card");
@@ -71,7 +77,7 @@ async function timelineView() {
     cards.append(card);
   }
   root.append(timelines.length ? cards : empty("还没有剪辑。先在作品档案审核图片、视频或音频，再新建第一份剪辑。"));
-  root.append(node("p", "mini-note", "素材选择展示当前偏好档案最近 300 份已审核作品。偏好档案用于组织内容，不是独立的用户权限。"));
+  root.append(node("p", "mini-note", "素材选择展示当前偏好档案最近 300 份已审核作品与 300 份已审核导入素材。偏好档案用于组织内容，不是独立的用户权限。"));
 }
 function timelineEditorHeader(titleText) {
   state.view = "timeline-edit";
@@ -98,7 +104,7 @@ function renderTimelineEditor() {
     seconds.onchange = () => { shot.duration = Math.max(Math.ceil(spec.fps / 4), Math.round(Number(seconds.value) * spec.fps)) / spec.fps; seconds.value = Number(shot.duration.toFixed(6)); timelineDirty(); };
     start.oninput = () => { shot.in = Number(start.value); timelineDirty(); };
     motion.onchange = () => { shot.motion = motion.value; timelineDirty(); };
-    if (!shot.source.file.endsWith(".mp4")) { start.value = 0; start.disabled = true; }
+    if (!timelineVideo(shot.source)) { start.value = 0; start.disabled = true; }
     else motion.disabled = true;
     add(row, head, preview, add(node("div", "field-grid"), field("时长（秒，自动对齐帧）", seconds), field("源视频入点（秒）", start), field("画面运动", motion)));
     shots.append(row); timelinePreview(shot.source, preview, shot);

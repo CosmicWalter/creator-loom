@@ -51,7 +51,7 @@ class Learning:
                     candidate["plan"]["technique_snapshot"] != proposal):
                 raise ValueError("Evaluation does not match the proposal's frozen baseline")
             def context(plan):
-                return {"preferences": plan["preferences"], "source_context": plan.get("context"),
+                return {"preferences": plan["preferences"], "source_context": plan.get("context"), "input_assets": plan.get("input_assets", []), "public_credits": plan.get("public_credits", []),
                         "steps": [{k: step[k] for k in ["id", "capability", "dependencies", "model"]}
                                   for step in plan["steps"]]}
             if context(baseline["plan"]) != context(candidate["plan"]):

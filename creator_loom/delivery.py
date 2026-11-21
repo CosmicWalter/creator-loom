@@ -6,6 +6,8 @@ import json
 import math
 import zipfile
 
+from .assets import Assets
+
 
 def delivery(engine, run_id):
     run = engine.store.run(run_id)
@@ -45,6 +47,7 @@ def delivery(engine, run_id):
                 entries.append({"name": name, "sha256": hashlib.sha256(raw).hexdigest(), "bytes": len(raw)})
         manifest = {"schema": 1, "generator": "Creator Loom", "format": run["brief"]["format"],
                     "language": run["brief"]["language"], "files": entries,
-                    "isolated_task": run["plan"].get("isolated_task")}
+                    "isolated_task": run["plan"].get("isolated_task"),
+                    "credits": list(run["plan"].get("public_credits", [])) + [Assets(engine.store).credits(ref["asset"]) for ref in run["plan"].get("input_assets", [])]}
         write("manifest.json", json.dumps(manifest, ensure_ascii=False, indent=2))
     return buffer.getvalue()

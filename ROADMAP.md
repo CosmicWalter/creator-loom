@@ -5,7 +5,7 @@ This is a delivery backlog, not a promise that the complete product is already a
 ## Foundation — in progress
 
 - [x] Independent, MIT-licensed codebase without private project material.
-- [x] CLI, seven explicit recipes, model capability cards and inspectable routing.
+- [x] CLI, eight explicit recipes (including text-only music planning), model capability cards and inspectable routing.
 - [x] Model/technique/preference snapshots, local state, submit-once behavior and artifact-bound review.
 - [x] Profile-specific feedback, public feed reading, sourced technique proposals, paired review, activation and rollback.
 - [x] Loopback provider contract tests and real FFmpeg pipeline tests with simulated inference.
@@ -31,7 +31,8 @@ This is a delivery backlog, not a promise that the complete product is already a
 - [ ] Rich character memory, automatic continuity proposals and direct-manipulation multi-track editing.
 - [x] Authenticated loopback workbench, frozen plan confirmation, artifact preview/review and structured deliverable export.
 - [x] Workbench book import, sequential creation, research inbox and text revision practice backed by existing APIs.
-- [ ] Browser interaction/visual acceptance and further usability iteration; generalized rights-aware media asset library.
+- [x] Rights-aware local image/audio/video imports, immutable review, source normalization, reusable timeline references and attribution-preserving bundles.
+- [ ] Browser interaction/visual acceptance, further usability iteration and richer asset search/version management.
 
 ## Learning system and open benchmark
 
@@ -55,4 +56,5 @@ This is a delivery backlog, not a promise that the complete product is already a
 
 - [x] Publish the project website to this repository's `gh-pages` branch; deployment and public asset hashes verified. Responsive styles exist; browser/mobile acceptance remains pending.
 - [ ] Verify browser/mobile interaction and usability of the implemented workbench timeline editor.
-- [ ] Rights-aware Suno adaptation workflow, explicit human handoff and verified receipt/import boundaries.
+- [x] Authorized music briefs, text-only lyric/direction planning, reproducible reference-audio edits and explicit operator handoff; imported results require local review and matching reported origin.
+- [ ] Live Suno generation/receipt verification, phonetic lyric assistance and controlled multi-take listening evaluations. Operator references are not provider receipts.

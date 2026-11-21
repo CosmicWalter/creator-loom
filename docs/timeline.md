@@ -6,7 +6,7 @@ For a form-based editor, run `loom serve --open` and choose **剪辑台**. The s
 
 ## Prepare sources and an edit
 
-Use normal creation recipes, inspect the actual artifacts, and approve the source runs. Inspect each run to obtain its step ID and artifact `file` value. Only reviewed PNG/PPM images, MP4 video and PCM-compatible WAV audio are accepted; raw file paths, network URLs and unreviewed outputs are rejected. This release reuses creation artifacts rather than importing arbitrary external media. Confirm rights to the content and music before reuse.
+Use normal creation recipes, inspect the actual artifacts, and approve the source runs. Inspect each run to obtain its step ID and artifact `file` value. Reviewed creation artifacts or explicitly imported and approved media can be selected. Raw filesystem paths, network URLs and unreviewed assets cannot be used as timeline references. Imports normalize PNG/JPEG to PNG, WAV/MP3 to PCM WAV, and MP4 to silent H.264 MP4; see [music and media](music.md). Confirm rights to the content and music before reuse.
 
 Start from [the edit template](../examples/timeline.json). Replace its source references with actual approved run IDs and artifact names. The template contains placeholders and is not a runnable demonstration without those sources.
 
@@ -15,7 +15,7 @@ loom timeline-new reading-film --spec edit.local.json
 loom timeline-inspect reading-film
 ```
 
-A shot has an ID, source reference, duration, optional `in` point and optional `motion`. Source hashes are frozen during creation. Durations must fall on exact frame boundaries. Supported canvases are 1280×720, 720×1280, 640×360 and 360×640 at 24, 25 or 30 fps. An edit has 1–120 shots, each 0.25–120 seconds, with at most ten minutes total duration.
+A shot has an ID, source reference, duration, optional `in` point and optional `motion`. Source hashes are frozen during creation. An imported source uses `{"asset":"APPROVED_ASSET_ID"}`; the planner freezes its hash and kind. Public attribution/license fields are carried into the delivered edit manifest, while private rights notes and origin links remain local. Durations must fall on exact frame boundaries. Supported canvases are 1280×720, 720×1280, 640×360 and 360×640 at 24, 25 or 30 fps. An edit has 1–120 shots, each 0.25–120 seconds, with at most ten minutes total duration.
 
 `still` preserves the full visual inside a padded canvas; `zoom-in` fills and crops a still image to the canvas, then zooms toward its center by 8%. Video shots use `in` and duration to trim the source; zoom motion is currently limited to still images. Cuts are direct; there are no transitions, compositing layers or automatic shot selection yet.
 

@@ -31,6 +31,8 @@ from .series import Series
 from .mediaflow import MediaFlow
 from .timeline import Timeline
 from . import timeline_media
+from .assets import Assets
+from .music import Music
 
 
 TIMELINE_ERRORS = {
@@ -59,6 +61,8 @@ class Workbench:
         self.coach = Coach(store, self.engine)
         self.research = Research(store, Learning(store, self.engine))
         self.timeline = Timeline(store)
+        self.assets = Assets(store)
+        self.music = Music(store, cards)
         self.pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix="loom-workbench")
         with store.connect() as db:
             db.execute("UPDATE web_timeline_actions SET status='interrupted',error='服务重启；请检查剪辑状态，未自动重新渲染。' WHERE status IN ('queued','running')")
@@ -149,9 +153,21 @@ class Workbench:
                     assets.append({"key": key, "title": brief["topic"], "stage": step["id"],
                                    "kind": "audio" if suffix == ".wav" else "video" if suffix == ".mp4" else "image",
                                    "ref": {"run": run["id"], "step": step["id"], "file": result["file"], "sha256": result["sha256"]}})
-        return {"assets": assets, "unavailable_runs": unavailable, "scope": "Most recent 300 approved runs in this preference profile"}
+        unavailable_assets = 0
+        for asset in self.assets.list(profile, "approved"):
+            try:
+                ref, _, payload = self.assets.reference({"asset": asset["id"]})
+            except (OSError, ValueError):
+                unavailable_assets += 1
+                continue
+            assets.append({"key": "asset/"+asset["id"], "title": payload["title"], "stage": "imported", "kind": payload["kind"], "ref": ref})
+        return {"assets": assets, "unavailable_runs": unavailable, "unavailable_assets": unavailable_assets,
+                "scope": "Most recent 300 approved runs and 300 approved imported assets in this preference profile"}
 
     def timeline_source(self, key):
+        if key.startswith("asset/"):
+            ref, path, payload = self.assets.reference({"asset": key.split("/")[1]})
+            return {"ref": ref, "kind": payload["kind"], "duration": payload["duration"], "preview": "/api/assets/"+ref["asset"]+"/media"}, path
         run_id, step_id, slot = key.split("/")
         run = self.store.run(run_id)
         step = next((s for s in run["steps"] if s["id"] == step_id), None)
@@ -204,9 +220,19 @@ class Workbench:
 
     def get(self, path, query):
         profile = identifier(query.get("profile", ["default"])[0])
+        if path == "/api/assets":
+            return self.assets.list(profile, query.get("state", [None])[0])
+        match = re.fullmatch(r"/api/assets/([A-Za-z0-9_-]+)", path)
+        if match:
+            return self.assets.inspect(match[1])
+        if path == "/api/music":
+            return self.music.list(profile)
+        match = re.fullmatch(r"/api/music/([A-Za-z0-9_-]+)", path)
+        if match:
+            return self.music.inspect(match[1])
         if path == "/api/timeline-assets":
             return self.timeline_assets(profile)
-        match = re.fullmatch(r"/api/timeline-assets/([A-Za-z0-9_-]+/[A-Za-z0-9_-]+/(?:main|s\d+))", path)
+        match = re.fullmatch(r"/api/timeline-assets/(asset/[A-Za-z0-9_-]+|[A-Za-z0-9_-]+/[A-Za-z0-9_-]+/(?:main|s\d+))", path)
         if match:
             return self.timeline_source(match[1])[0]
         if path == "/api/timelines":
@@ -270,6 +296,29 @@ class Workbench:
         raise ValueError("Unknown endpoint")
 
     def post(self, path, body, key):
+        if path == "/api/assets":
+            identifier(key)
+            raw = base64.b64decode(body["data"], validate=True)
+            if len(raw) > 32*1024*1024:
+                raise ValueError("Workbench media uploads are limited to 32 MB; use the CLI for sources up to 64 MB")
+            return self.assets.import_bytes(raw, body["metadata"], key)
+        match = re.fullmatch(r"/api/assets/([A-Za-z0-9_-]+)/(review|derive)", path)
+        if match:
+            if match[2] == "review":
+                return self.assets.review(match[1], body["decision"], body["note"])
+            identifier(key)
+            return self.assets.derive_audio(match[1], body["settings"], key)
+        if path == "/api/music":
+            identifier(key)
+            return self.music.create(body["id"], body["spec"], key)
+        match = re.fullmatch(r"/api/music/([A-Za-z0-9_-]+)/(handoff|external|attach)", path)
+        if match:
+            name, operation = match.groups()
+            if operation == "handoff":
+                return self.music.handoff(name, body.get("transfer_authorized"), body["note"], body.get("include_audio", False))
+            if operation == "external":
+                return self.music.external(name, body["reference"], body["note"])
+            return self.music.attach(name, body["asset"], body["note"])
         if path == "/api/timelines":
             identifier(key)
             return self.timeline.create(body["id"], body["spec"], body.get("profile", "default"), request_key=key)
@@ -417,10 +466,10 @@ class Handler(BaseHTTPRequestHandler):
             if self.headers.get("Host") != urlsplit(self.server.origin).netloc:
                 return self.respond(403, {"error": "只允许本机工作台访问。"})
             parsed = urlsplit(self.path)
-            if parsed.path in {"/", "/app.js", "/app.css", "/timeline.js"}:
-                name = {"/": "index.html", "/app.js": "app.js", "/app.css": "app.css", "/timeline.js": "timeline.js"}[parsed.path]
+            if parsed.path in {"/", "/app.js", "/app.css", "/timeline.js", "/media.js"}:
+                name = {"/": "index.html", "/app.js": "app.js", "/app.css": "app.css", "/timeline.js": "timeline.js", "/media.js": "media.js"}[parsed.path]
                 raw = (Path(__file__).parent/"static"/name).read_bytes()
-                mime = {"index.html": "text/html", "app.js": "text/javascript", "app.css": "text/css", "timeline.js": "text/javascript"}[name]
+                mime = {"index.html": "text/html", "app.js": "text/javascript", "app.css": "text/css", "timeline.js": "text/javascript", "media.js": "text/javascript"}[name]
                 self.headers_for(200, mime+"; charset=utf-8", len(raw))
                 return self.wfile.write(raw)
             if not self.trusted():
@@ -429,6 +478,20 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond(401, {"error": "请输入本机工作台访问码。"})
             if parsed.path == "/api/session":
                 return self.respond(200, {"authenticated": True})
+            match = re.fullmatch(r"/api/assets/([A-Za-z0-9_-]+)/export", parsed.path)
+            if match:
+                raw = self.server.app.assets.bundle(match[1])
+                self.headers_for(200, "application/zip", len(raw), {"Content-Disposition": 'attachment; filename="creator-loom-media-asset.zip"'})
+                return self.wfile.write(raw)
+            match = re.fullmatch(r"/api/assets/([A-Za-z0-9_-]+)/media", parsed.path)
+            if match:
+                _, target = self.server.app.assets.verify(match[1])
+                return self.stream_file(target)
+            match = re.fullmatch(r"/api/music/([A-Za-z0-9_-]+)/handoff", parsed.path)
+            if match:
+                raw = self.server.app.music.handoff_bytes(match[1])
+                self.headers_for(200, "application/zip", len(raw), {"Content-Disposition": 'attachment; filename="creator-loom-music-handoff.zip"'})
+                return self.wfile.write(raw)
             if re.fullmatch(r"/api/artifacts/[A-Za-z0-9_-]+/[A-Za-z0-9_-]+/(?:main|s\d+)", parsed.path):
                 return self.artifact(parsed.path)
             match = re.fullmatch(r"/api/timeline-media/([A-Za-z0-9_-]+)/(\d+)/(film\.mp4|captions\.srt|captions\.vtt|timeline\.json)", parsed.path)
@@ -521,7 +584,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.close_connection = True
                 return self.respond(403, {"error": "请求来源未被允许。"})
             length = int(self.headers.get("Content-Length", "0"))
-            if not 0 < length <= 12*1024*1024 or self.headers.get_content_type() != "application/json":
+            limit = 46*1024*1024 if self.path == "/api/assets" else 12*1024*1024
+            if not 0 < length <= limit or self.headers.get_content_type() != "application/json":
                 self.close_connection = True
                 return self.respond(413, {"error": "请求格式或大小不受支持。"})
             body = json.loads(self.rfile.read(length))

@@ -27,9 +27,21 @@ The learning radar shows subscribed sources, literal keyword evidence and preser
 
 Completed works offer medium-specific review questions. The browser revision editor currently supports text steps; it records an actually changed draft, dimension, before/after self-ratings and a rationale. Other media retain review questions and ordinary feedback. Progress is self-reported, not proof of independently measured skill gains.
 
+## Media and music
+
+**素材与音乐** imports explicitly authorized PNG/JPEG images, WAV/MP3 audio and MP4 video, with a 32 MB browser limit (64 MB via CLI). Original bytes stay in local data storage under a generic name; local filenames and device paths are not persisted. FFmpeg normalizes the media and removes inherited container metadata. Review actual content, rights, privacy and required attribution before approval. Only approved assets enter timelines or music plans. Normalization does not certify anonymity, license validity or creative rights.
+
+Private rights notes and operator origin links stay out of delivery packages. Public attribution and license fields accompany approved asset ZIPs, music handoffs and timeline edit manifests. Original video audio is omitted during video normalization; audio must be imported/selected explicitly as an audio asset. Deleting a preference profile does not erase assets, music projects or their review/provenance records.
+
+Approved audio offers reproducible reference edits: bounded input trim, independent speed/pitch or tape-style linked speed/pitch. Every derived file records its parent and settings, inherits credits and requires another review. This is audio processing, not generative rearrangement.
+
+A music project reserves a normal, inspectable lyric/direction run under model constraints. Explicitly execute and approve that run before handoff. Text models receive the title, intent and authorized lyrics; the bound reference audio and private rights note are not sent to those models. Only an explicit transfer decision prepares a local handoff ZIP, and audio is excluded unless separately selected. Nothing is submitted to Suno by this application.
+
+External song/share links and notes are operator reports. They do not verify provider execution, account identity, availability, billing or ownership. To adopt a result, import authorized audio with the same reported Suno origin, review the actual file, then bind it to the project. This verifies the local artifact/hash/review and matching declaration, not a provider receipt. See [music workflow](music.md).
+
 ## Editing room
 
-Open **剪辑台** to select already approved images/video/WAV audio. Source choices are organized by the current preference profile and cover its most recent 300 approved runs; a missing or changed source is omitted and counted. Profiles organize preferences and content, not separate users or authorization. Existing CLI timelines migrate to `default`; new CLI timelines can specify `--profile`.
+Open **剪辑台** to select already approved images/video/WAV audio. Source choices are organized by the current preference profile and cover its most recent 300 approved runs plus 300 approved imported assets; a missing or changed source is omitted and counted. Profiles organize preferences and content, not separate users or authorization. Existing CLI timelines migrate to `default`; new CLI timelines can specify `--profile`.
 
 Create an edit with a title, canvas and frame rate. Add shots, move them earlier/later, set duration and source-video in points, and choose still-image center zoom where appropriate. The editor aligns duration to frame boundaries. Preview is of the actual source image/clip: PPM is converted to PNG locally, not replaced with a differently typeset SVG. Final crop and motion must be checked on the rendered film.
 
@@ -57,6 +69,6 @@ Drafts, actions and run data persist in the selected data directory, which is ig
 
 ## Verification status
 
-Real HTTP tests cover authentication, Host/Origin boundaries, frozen/idempotent creation, background cover execution, verified previews/ranges, approval/export, source import/series setup, text revision practice, session renewal and non-replayed interrupted actions. Additional real HTTP/FFmpeg checks cover the editing room, source preview, duplicate saves/renders, legacy profile migration, stale queued revisions, WebVTT/SRT delivery, authentication and tamper rejection. JavaScript syntax and packaged frontend assets are checked separately.
+Real HTTP tests cover authentication, Host/Origin boundaries, frozen/idempotent creation, background cover execution, verified previews/ranges, approval/export, source import/series setup, text revision practice, session renewal and non-replayed interrupted actions. Additional real HTTP/FFmpeg checks cover media import/review, music planning/handoff/adoption and the editing room, source preview, duplicate saves/renders, legacy profile migration, stale queued revisions, WebVTT/SRT delivery, authentication and tamper rejection. JavaScript syntax and packaged frontend assets are checked separately.
 
 Browser interaction and visual acceptance have not yet been recorded. HTTP tests and source inspection do not establish responsive layout quality or prove that every browser interaction works. Continue that acceptance before presenting the workbench as production ready.

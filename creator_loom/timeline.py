@@ -11,6 +11,7 @@ from pathlib import Path
 
 from .domain import bounded, identifier
 from .engine import Engine, digest
+from .assets import Assets
 from .locking import run_lock
 from . import timeline_media as media
 
@@ -25,6 +26,9 @@ class Timeline:
         return run_lock(self.store, hashlib.sha256(("timeline:"+name).encode()).hexdigest())
 
     def reference(self, ref, kind):
+        if isinstance(ref, dict) and "asset" in ref:
+            frozen, path, _ = Assets(self.store).reference(ref, kind)
+            return frozen, path, media.probe(path)
         if not isinstance(ref, dict) or not {"run", "step", "file"} <= set(ref) or set(ref)-{"run", "step", "file", "sha256"}:
             raise ValueError("Source needs run, step, file and optional sha256")
         identifier(ref["run"]); identifier(ref["step"])
@@ -246,14 +250,16 @@ class Timeline:
     def directory(self, name, version):
         return self.store.root/"timelines"/name/str(version)
 
-    @staticmethod
-    def public_edit(spec):
+    def public_edit(self, spec):
         result = {k: spec[k] for k in ["title", "width", "height", "fps", "duration", "captions"]}
         result["shots"] = [{k: shot[k] for k in ["id", "duration", "in", "motion"]} |
                            {"source_sha256": shot["source"]["sha256"]} for shot in spec["shots"]]
         for role in ["narration", "music"]:
             track = spec[role]
             result[role] = {k: track[k] for k in ["in", "gain", "loop"]} | {"source_sha256": track["source"]["sha256"]} if track else None
+        asset_ids = {s["source"]["asset"] for s in spec["shots"] if "asset" in s["source"]}
+        asset_ids.update(spec[k]["source"]["asset"] for k in ["narration", "music"] if spec[k] and "asset" in spec[k]["source"])
+        result["credits"] = [Assets(self.store).credits(name) for name in sorted(asset_ids)]
         result["caption_alignment"] = "Explicit editor timings; not automatic speech or word alignment"
         return result
 

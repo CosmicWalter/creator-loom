@@ -59,3 +59,5 @@ Only integer, nonnegative `usage.prompt_tokens` and `usage.completion_tokens` wi
 `priced_steps` and `unpriced_steps` report token-estimate coverage. The subtotal is **not total spending**: images, speech and local tools have no token estimate here, and unknown remote effects may have been billed. Measured usage does not currently replace the planner's per-call cost estimate.
 
 `forget PROFILE` removes preferences, feedback and measurement rows used by future decisions. Frozen run artifacts, embedded measurements, practice, evaluations and audit events remain. This is a local decision reset, not a full data-erasure API.
+
+Music planning uses `song:lyrics` and `song:direction` task scopes. These score text planning outputs, not the quality of music generated outside the application. A bound reference audio asset is provenance for the operator; it is not passed as multimodal input to the current text adapters.

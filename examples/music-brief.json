@@ -1,0 +1,15 @@
+{
+  "title": "The quiet lantern",
+  "intent": "Develop an original gentle song about a fictional lantern keeper, with a warm voice and restrained acoustic arrangement.",
+  "lyrics": "A quiet lantern by the sea,\nA little light for you and me.",
+  "lyrics_rights": "owned",
+  "lyrics_attribution": "",
+  "lyrics_license_url": "",
+  "rights_note": "Replace with your actual authorization for the lyrics, source audio and adaptation.",
+  "adaptation_authorized": false,
+  "profile": "default",
+  "language": "en",
+  "budget": 1,
+  "local_only": true,
+  "max_latency": 300
+}

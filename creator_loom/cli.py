@@ -8,6 +8,8 @@ import time
 from pathlib import Path
 
 from .timeline import Timeline
+from .assets import Assets
+from .music import Music
 from .benchmarks import Benchmarks
 from .domain import Brief, RECIPES, identifier
 from .coaching import Coach
@@ -203,6 +205,35 @@ def main(argv=None):
             p.add_argument("shot")
             p.add_argument("--decision", choices=["approve", "reject"], required=True)
             p.add_argument("--note", required=True)
+    p = sub.add_parser("asset-import")
+    p.add_argument("file", type=Path)
+    p.add_argument("--metadata", type=Path, required=True)
+    p.add_argument("--key")
+    for command in ["asset-inspect", "asset-review", "asset-derive"]:
+        p = sub.add_parser(command)
+        p.add_argument("id")
+        if command == "asset-review":
+            p.add_argument("--decision", choices=["approve", "reject"], required=True)
+            p.add_argument("--note", required=True)
+        if command == "asset-derive":
+            p.add_argument("--settings", type=Path, required=True)
+            p.add_argument("--key")
+    p = sub.add_parser("music-new")
+    p.add_argument("id")
+    p.add_argument("--spec", type=Path, required=True)
+    p.add_argument("--key")
+    for command in ["music-inspect", "music-handoff", "music-external", "music-attach"]:
+        p = sub.add_parser(command)
+        p.add_argument("id")
+        if command != "music-inspect":
+            p.add_argument("--note", required=True)
+        if command == "music-handoff":
+            p.add_argument("--transfer-authorized", action="store_true")
+            p.add_argument("--include-audio", action="store_true")
+        elif command == "music-external":
+            p.add_argument("--reference", required=True)
+        elif command == "music-attach":
+            p.add_argument("--asset", required=True)
     args = parser.parse_args(argv)
     try:
         store = Store(args.data)
@@ -213,7 +244,29 @@ def main(argv=None):
         library = Library(store)
         series = Series(store, engine)
         research = Research(store, learning)
-        if args.command.startswith("timeline-"):
+        if args.command.startswith("asset-"):
+            assets = Assets(store)
+            if args.command == "asset-import":
+                emit(assets.import_file(args.file, json.loads(args.metadata.read_text()), args.key))
+            elif args.command == "asset-inspect":
+                emit(assets.inspect(args.id))
+            elif args.command == "asset-review":
+                emit(assets.review(args.id, args.decision, args.note))
+            else:
+                emit(assets.derive_audio(args.id, json.loads(args.settings.read_text()), args.key))
+        elif args.command.startswith("music-"):
+            music = Music(store, cards)
+            if args.command == "music-new":
+                emit(music.create(args.id, json.loads(args.spec.read_text()), args.key))
+            elif args.command == "music-inspect":
+                emit(music.inspect(args.id))
+            elif args.command == "music-handoff":
+                emit(music.handoff(args.id, args.transfer_authorized, args.note, args.include_audio))
+            elif args.command == "music-external":
+                emit(music.external(args.id, args.reference, args.note))
+            else:
+                emit(music.attach(args.id, args.asset, args.note))
+        elif args.command.startswith("timeline-"):
             timeline = Timeline(store)
             action = args.command.removeprefix("timeline-")
             if action == "new":
@@ -313,7 +366,7 @@ def main(argv=None):
             identifier(args.profile)
             store.forget(args.profile)
             emit({"status": "preferences_routing_feedback_and_measurements_deleted",
-                  "retained": "timeline versions/shot reviews/renders, workbench plans/actions, remote operation receipts, research subscriptions/evidence, books, series continuity, creative runs, artifacts (including embedded metrics), practice, evaluations and audit events"})
+                  "retained": "media assets/music projects/rights/reviews, timeline versions/shot reviews/renders, workbench plans/actions, remote operation receipts, research subscriptions/evidence, books, series continuity, creative runs, artifacts (including embedded metrics), practice, evaluations and audit events"})
         elif args.command == "models":
             emit([m.to_dict() for m in cards])
         elif args.command == "discover":

@@ -19,7 +19,7 @@ def main():
     allowed_email = "189211877+CosmicWalter@users.noreply.github.com"
     for name in filter(None, tracked):
         p = root / name
-        if name.startswith(("data/", "outputs/", ".venv/")) or name.endswith((".sqlite3", ".pem", ".key")) or name == "config.local.json" or p.name.startswith(".env"):
+        if name.startswith(("data/", "outputs/", ".venv/")) or name.endswith((".sqlite3", ".pem", ".key")) or p.name.endswith(".local.json") or p.name.startswith(".env"):
             problems.append((name, "private/runtime file tracked"))
             continue
         if p.is_symlink():

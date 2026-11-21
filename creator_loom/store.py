@@ -82,6 +82,17 @@ class Store:
                 CREATE TABLE IF NOT EXISTS remote_batches (
                   run_id TEXT NOT NULL, step_id TEXT NOT NULL, payload TEXT NOT NULL,
                   PRIMARY KEY(run_id,step_id));
+                CREATE TABLE IF NOT EXISTS media_assets (
+                  id TEXT PRIMARY KEY, profile TEXT NOT NULL, state TEXT NOT NULL,
+                  payload TEXT NOT NULL, review TEXT, created TEXT DEFAULT CURRENT_TIMESTAMP);
+                CREATE TABLE IF NOT EXISTS asset_imports (
+                  id TEXT PRIMARY KEY, fingerprint TEXT NOT NULL, asset_id TEXT NOT NULL);
+                CREATE TABLE IF NOT EXISTS music_projects (
+                  id TEXT PRIMARY KEY, definition TEXT NOT NULL, run_id TEXT NOT NULL,
+                  state TEXT NOT NULL, handoff TEXT, external TEXT, result TEXT,
+                  created TEXT DEFAULT CURRENT_TIMESTAMP);
+                CREATE TABLE IF NOT EXISTS music_requests (
+                  id TEXT PRIMARY KEY, fingerprint TEXT NOT NULL, project_id TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS web_drafts (
                   id TEXT PRIMARY KEY, plan TEXT NOT NULL, expires REAL NOT NULL);
                 CREATE TABLE IF NOT EXISTS web_submissions (

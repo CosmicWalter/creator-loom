@@ -1024,3 +1024,11 @@ meter {
 @media (max-width: 640px) { .timeline-editor .panel { padding: 18px; } .timeline-shot-head .toolbar { gap: 8px; flex-wrap: wrap; } .timeline-shot-head button { padding: 9px 12px; font-size: 14px; } }
 .timeline-content { font-size: 16px; }
 .timeline-content label, .timeline-content .mini-note, .timeline-content .subtle, .timeline-content .chip, .timeline-content button { font-size: 14px; }
+.media-form { font-size: 16px; }
+.media-form h2 { font-size: 24px; margin: 0 0 16px; }
+.media-form label, .media-form .mini-note, .media-form .subtle, .media-form button { font-size: 14px; }
+.media-form input, .media-form select, .media-form textarea { font-size: 16px; }
+.media-form input[type="checkbox"] { width: 20px; height: 20px; flex: 0 0 auto; }
+.media-form form { margin-top: 22px; }
+
+.media-form p { overflow-wrap: anywhere; white-space: pre-wrap; }

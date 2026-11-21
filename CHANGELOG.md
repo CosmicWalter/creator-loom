@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.0
+
+- Add a rights-aware local media library for PNG/JPEG, WAV/MP3 and MP4: bounded normalization, original/normalized hashes, explicit immutable review, generic filenames and attribution-preserving delivery.
+- Reuse approved imported assets in workbench timelines. Carry public credits while excluding private rights notes, source paths and operator reference URLs from delivery manifests.
+- Add reproducible reference-audio trim, independent tempo/pitch and tape-style processing with inherited provenance, new review and real decoded-frequency/duration tests.
+- Add task-routed lyric/direction plans, approved source binding and explicit manual Suno handoff. Reference audio enters the package only when selected and transfer-authorized; no Suno generation or submission is performed.
+- Record operator-reported external references separately from locally verified audio imports, approval and adoption. Preserve this evidence distinction in CLI, workbench and docs.
+- Verify actual local media/HTTP flows with original synthetic content and simulated text inference. Live Suno generation, remote receipt validation, browser acceptance and creative-quality claims remain unverified.
+
 ## 0.10.0
 
 - Add a local workbench editing room for approved source selection, actual image/media previews, shot reordering, timing/crop settings, narration/music controls and caption entry without hand-written JSON.
