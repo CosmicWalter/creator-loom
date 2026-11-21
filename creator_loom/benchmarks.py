@@ -62,30 +62,34 @@ class Benchmarks:
             plans.append((case["id"], base, candidate))
         if len(profiles) != 1:
             raise ValueError("Benchmark cases must share a profile")
-        # Persist the split before generation or comparative review. The actual
-        # sealed mapping is local owner data, not cryptographic reviewer isolation.
-        shuffled = list(case_ids)
-        secrets.SystemRandom().shuffle(shuffled)
-        development = set(shuffled[:len(shuffled)//2])
         protocol = {"task": task, "target": target, "baseline_model": spec["baseline_model"],
                     "candidate_model": spec["candidate_model"], "profile": next(iter(profiles)),
                     "method": "shared upstream artifacts; randomized A/B presentation; preassigned development/holdout split",
                     "cost_caveat": "Conservative full-plan sum; candidate upstream is reused. Not invoices or a budget-matched experiment.",
                     "planned_cost_estimate": sum(p["estimated_cost"] for _, a, b in plans for p in [a, b])}
+        protocol["kind"] = "model"
         with self.store.connect() as db:
             db.execute("BEGIN IMMEDIATE")
-            db.execute("INSERT INTO benchmarks(id,protocol,state) VALUES(?,?,'development')", (name, json.dumps(protocol)))
-            for case_id, baseline, candidate in plans:
-                base_id, cand_id = uuid.uuid4().hex, uuid.uuid4().hex
-                for arm, run_id, plan in [("baseline", base_id, baseline), ("candidate", cand_id, candidate)]:
-                    plan["benchmark"] = {"id": name, "case": case_id, "arm": arm, "target": target}
-                    self.engine.persist(db, run_id, plan)
-                order = ["baseline", "candidate"]
-                secrets.SystemRandom().shuffle(order)
-                db.execute("INSERT INTO benchmark_cases(benchmark_id,id,partition,baseline_run,candidate_run,display_order) VALUES(?,?,?,?,?,?)",
-                           (name, case_id, "development" if case_id in development else "holdout", base_id, cand_id, json.dumps(order)))
-            self.store.event(db, "benchmark_created", name, {"task": task, "cases": len(plans)})
+            self.persist_in(db, name, plans, protocol)
         return self.inspect(name)
+
+    def persist_in(self, db, name, plans, protocol):
+        identifier(name)
+        # Split and presentation mapping are committed before any generation.
+        shuffled = [case_id for case_id, _, _ in plans]
+        secrets.SystemRandom().shuffle(shuffled)
+        development = set(shuffled[:len(shuffled)//2])
+        db.execute("INSERT INTO benchmarks(id,protocol,state) VALUES(?,?,'development')", (name, json.dumps(protocol)))
+        for case_id, baseline, candidate in plans:
+            base_id, cand_id = uuid.uuid4().hex, uuid.uuid4().hex
+            for arm, run_id, plan in [("baseline", base_id, baseline), ("candidate", cand_id, candidate)]:
+                plan["benchmark"] = {"id": name, "case": case_id, "arm": arm, "target": protocol["target"]}
+                self.engine.persist(db, run_id, plan)
+            order = ["baseline", "candidate"]
+            secrets.SystemRandom().shuffle(order)
+            db.execute("INSERT INTO benchmark_cases(benchmark_id,id,partition,baseline_run,candidate_run,display_order) VALUES(?,?,?,?,?,?)",
+                       (name, case_id, "development" if case_id in development else "holdout", base_id, cand_id, json.dumps(order)))
+        self.store.event(db, "benchmark_created", name, {"task": protocol["task"], "cases": len(plans), "kind": protocol.get("kind", "model")})
 
     def _load(self, name):
         identifier(name)
@@ -183,7 +187,7 @@ class Benchmarks:
             result["outputs"][label] = {"bytes": artifact.read_bytes(), "suffix": artifact.suffix}
         return result
 
-    def write_packet(self, name, case_id):
+    def packet_bytes(self, name, case_id):
         packet = self.packet(name, case_id)
         stream = io.BytesIO()
         with zipfile.ZipFile(stream, "w", zipfile.ZIP_DEFLATED) as archive:
@@ -201,11 +205,24 @@ class Benchmarks:
                 "rubric": "Score fitness to the brief, clarity and medium-specific craft consistently, 0–1.",
                 "shared_inputs": list(packet["shared_inputs"]),
                 "scores": {"A": None, "B": None}, "rationale": ""}, ensure_ascii=False, indent=2))
+        return stream.getvalue()
+
+    def write_packet(self, name, case_id):
+        raw = self.packet_bytes(name, case_id)
         directory = self.store.root/"benchmark_packets"/name
         directory.mkdir(parents=True, exist_ok=True)
         path = directory/(case_id+".zip")
-        path.write_bytes(stream.getvalue())
+        path.write_bytes(raw)
         return {"packet": str(path), "labels": ["A", "B"], "model_mapping_included": False}
+
+    def target_artifact(self, name, case_id, label):
+        if label not in {"A", "B"}:
+            raise ValueError("Blind output label must be A or B")
+        trial = self._load(name)
+        case = self._case(trial, case_id)
+        arm = json.loads(case["display_order"])[["A", "B"].index(label)]
+        run = self.store.run(case[arm+"_run"])
+        return self.engine.artifact(run["id"], run["steps"][-1]["result"])
 
     def review(self, name, case_id, scores, rationale):
         if not isinstance(scores, dict) or set(scores) != {"A", "B"}:
@@ -275,6 +292,8 @@ class Benchmarks:
         return result
 
     def calibrate(self, name):
+        if self._load(name)["protocol"].get("kind", "model") != "model":
+            raise ValueError("Technique experiments cannot calibrate model quality feedback")
         result = self.report(name)
         trial = self._load(name)
         # Only the reserved holdout observations enter routing feedback, after

@@ -10,7 +10,7 @@ if not wheels:
     raise SystemExit("No Creator Loom wheel found")
 for wheel in wheels:
     with zipfile.ZipFile(wheel) as archive:
-        for name in ["creator_loom/static/index.html", "creator_loom/static/app.js", "creator_loom/static/app.css", "creator_loom/static/timeline.js", "creator_loom/static/media.js"]:
+        for name in ["creator_loom/static/index.html", "creator_loom/static/app.js", "creator_loom/static/app.css", "creator_loom/static/timeline.js", "creator_loom/static/media.js", "creator_loom/static/lab.js"]:
             if name not in archive.namelist() or not archive.read(name):
                 raise SystemExit("Workbench asset missing from package: " + name)
 print("Installable wheel contains the workbench HTML, JavaScript and styles")

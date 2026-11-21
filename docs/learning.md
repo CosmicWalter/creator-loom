@@ -49,3 +49,7 @@ Feed ingestion runs manually or in an explicitly started foreground `research-wo
 Techniques contain short editorial instructions and source links, not executable plugins. A source link is evidence to inspect, not a verified endorsement. This version does not install dependencies, download weights, rewrite source code, change production services, or publish content automatically. Such future capabilities need sandboxed proposals, reproducible evaluation and explicit deployment records.
 
 Rollback changes future plans. Existing runs keep their frozen technique and prompts for reproducibility.
+
+## Task-scoped synthesis experiments
+
+Model-assisted proposals use the [research lab](research-lab.md), which binds selected evidence and the synthesis artifact, requires manual source/license/compatibility review, and permits only the stored held-out scores in evaluation. These proposals cannot bypass the reserved experiment through generic evaluate. Effective editorial methods are saved per step; a scoped activation preserves the frozen inherited method on other tasks. New baseline snapshots are hash references rather than recursively copied payloads; legacy inline snapshots remain readable. Missing/changed referenced baseline records block evaluation/promotion, while rollback remains available for recovery.

@@ -20,6 +20,7 @@ from .store import Store
 from .library import Library
 from .series import Series
 from .research import Research
+from .lab import Lab
 from .mediaflow import Client as MediaFlowClient, MediaFlow
 
 
@@ -234,6 +235,18 @@ def main(argv=None):
             p.add_argument("--reference", required=True)
         elif command == "music-attach":
             p.add_argument("--asset", required=True)
+    p = sub.add_parser("lab-new")
+    p.add_argument("id")
+    p.add_argument("--spec", type=Path, required=True)
+    p.add_argument("--key")
+    for command in ["lab-inspect", "lab-draft", "lab-accept", "lab-experiment", "lab-evaluate", "lab-promote", "lab-rollback"]:
+        p = sub.add_parser(command)
+        p.add_argument("id")
+        if command == "lab-accept":
+            p.add_argument("technique")
+            p.add_argument("--review", type=Path, required=True)
+        if command == "lab-experiment":
+            p.add_argument("--settings", type=Path, required=True)
     args = parser.parse_args(argv)
     try:
         store = Store(args.data)
@@ -244,7 +257,20 @@ def main(argv=None):
         library = Library(store)
         series = Series(store, engine)
         research = Research(store, learning)
-        if args.command.startswith("asset-"):
+        if args.command.startswith("lab-"):
+            lab = Lab(store, cards)
+            action = args.command.removeprefix("lab-")
+            if action == "new":
+                emit(lab.create(args.id, json.loads(args.spec.read_text()), args.key))
+            elif action == "accept":
+                emit(lab.accept(args.id, args.technique, json.loads(args.review.read_text())))
+            elif action == "experiment":
+                emit(lab.experiment(args.id, json.loads(args.settings.read_text())))
+            elif action in {"promote", "rollback"}:
+                emit(lab.activate(args.id, rollback=action == "rollback"))
+            else:
+                emit(getattr(lab, action)(args.id))
+        elif args.command.startswith("asset-"):
             assets = Assets(store)
             if args.command == "asset-import":
                 emit(assets.import_file(args.file, json.loads(args.metadata.read_text()), args.key))
@@ -366,7 +392,7 @@ def main(argv=None):
             identifier(args.profile)
             store.forget(args.profile)
             emit({"status": "preferences_routing_feedback_and_measurements_deleted",
-                  "retained": "media assets/music projects/rights/reviews, timeline versions/shot reviews/renders, workbench plans/actions, remote operation receipts, research subscriptions/evidence, books, series continuity, creative runs, artifacts (including embedded metrics), practice, evaluations and audit events"})
+                  "retained": "research syntheses/experiments/evidence, media assets/music projects/rights/reviews, timeline versions/shot reviews/renders, workbench plans/actions, remote operation receipts, research subscriptions/evidence, books, series continuity, creative runs, artifacts (including embedded metrics), practice, evaluations and audit events"})
         elif args.command == "models":
             emit([m.to_dict() for m in cards])
         elif args.command == "discover":

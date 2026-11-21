@@ -82,6 +82,12 @@ class Store:
                 CREATE TABLE IF NOT EXISTS remote_batches (
                   run_id TEXT NOT NULL, step_id TEXT NOT NULL, payload TEXT NOT NULL,
                   PRIMARY KEY(run_id,step_id));
+                CREATE TABLE IF NOT EXISTS research_labs (
+                  id TEXT PRIMARY KEY, protocol TEXT NOT NULL, run_id TEXT NOT NULL,
+                  state TEXT NOT NULL, technique_id TEXT, accepted TEXT, experiment_id TEXT,
+                  evaluation TEXT, created TEXT DEFAULT CURRENT_TIMESTAMP);
+                CREATE TABLE IF NOT EXISTS lab_requests (
+                  id TEXT PRIMARY KEY, fingerprint TEXT NOT NULL, lab_id TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS media_assets (
                   id TEXT PRIMARY KEY, profile TEXT NOT NULL, state TEXT NOT NULL,
                   payload TEXT NOT NULL, review TEXT, created TEXT DEFAULT CURRENT_TIMESTAMP);

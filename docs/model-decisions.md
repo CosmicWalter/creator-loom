@@ -61,3 +61,5 @@ Only integer, nonnegative `usage.prompt_tokens` and `usage.completion_tokens` wi
 `forget PROFILE` removes preferences, feedback and measurement rows used by future decisions. Frozen run artifacts, embedded measurements, practice, evaluations and audit events remain. This is a local decision reset, not a full data-erasure API.
 
 Music planning uses `song:lyrics` and `song:direction` task scopes. These score text planning outputs, not the quality of music generated outside the application. A bound reference audio asset is provenance for the operator; it is not passed as multimodal input to the current text adapters.
+
+`research:synthesis` is a text decision task for evidence synthesis, separate from creative-quality feedback. The synthesis plan suppresses active editorial guidance to avoid recursively biasing evidence interpretation. A task-scoped method records the effective inherited/editorial method on each creative step; the active method root alone does not imply that every task uses the newest instruction.

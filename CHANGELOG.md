@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.12.0
+
+- Add model-assisted public-feed synthesis with frozen evidence revisions, exact quotation validation, explicit insufficient-evidence results and structured original experiment briefs. Sources remain untrusted data; no code/tools or full-paper reading is implied.
+- Require artifact approval plus human source/license/compatibility review before a synthesis becomes a task-scoped proposed editorial method.
+- Freeze same-model, shared-upstream paired experiments with randomized A/B presentation, sealed development and reserved holdout review. Only recorded holdout scores can reach technique evaluation; model routing feedback is not calibrated by technique experiments.
+- Add workbench and CLI synthesis/experiment flows through explicit activation and rollback. Preserve inherited methods for other tasks using flat effective-method maps and hashed baseline references, with legacy snapshot reads.
+- Verify synthetic end-to-end HTTP learning, source/artifact integrity, bypass rejection, bounded repeated updates and rollback after artifact loss. Live model creative-quality and browser acceptance remain pending.
+
 ## 0.11.0
 
 - Add a rights-aware local media library for PNG/JPEG, WAV/MP3 and MP4: bounded normalization, original/normalized hashes, explicit immutable review, generic filenames and attribution-preserving delivery.

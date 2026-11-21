@@ -502,3 +502,71 @@ class WorkbenchTest(unittest.TestCase):
         attached = self.api("POST", "/api/music/music-fixture/attach", {"asset": result["id"], "note": "Reviewed local result adopted for this brief."})
         self.assertEqual(attached["state"], "result_attached")
         self.assertIn("operator-reported", attached["result"]["evidence"])
+
+
+    def test_research_lab_http_grounding_holdout_review_and_reversible_activation(self):
+        self.login()
+        self.server.app.cards.append(ModelCard("lab-writer", "text", "chat", model="fixture", local=True, endpoint="http://127.0.0.1:8765/v1", max_chars=40000))
+        research = self.server.app.research
+        research.fetcher = lambda _: [{"title": "Original synthetic writing guidance", "source": "https://example.com/writing-note", "summary": "Use concrete observations and preserve a clear causal order in original short writing.", "published": "2026-11-21"}]
+        research.subscribe("lab-source", "https://github.com/Comfy-Org/ComfyUI/releases.atom", [])
+        research.refresh("lab-source")
+        item = research.inbox()[0]
+        spec = {"task": "article:draft", "sources": [{"item": item["id"], "revision": 1}], "goal": "Investigate a bounded clarity method using this original evidence.", "local_only": True}
+        key = uuid.uuid4().hex
+        created = self.api("POST", "/api/labs", {"id": "http-lab", "spec": spec}, {"Idempotency-Key": key})
+        self.assertEqual(self.api("POST", "/api/labs", {"id": "http-lab", "spec": spec}, {"Idempotency-Key": key})["run_id"], created["run_id"])
+        self.assertEqual(self.request("GET", "/api/labs/http-lab", auth=False)[0], 401)
+        self.assertEqual(self.request("GET", "/api/labs/http-lab/draft")[0], 409)
+        value = {"status": "propose", "task": "article:draft", "title": "Concrete causal observations", "hypothesis": "Clear causal order may improve original writing, subject to review.", "guidance": "Use concrete observations and explicitly connect cause and consequence.",
+                 "citations": [{"item": item["id"], "revision": 1, "quote": item["payload"]["summary"], "supports": "The literal note suggests a method, but no measured effect is established."}],
+                 "license_caution": "Original synthetic fixture; real licensing must be reviewed.", "compatibility": "editorial-only", "limitations": "No actual independent creative-quality evidence.", "cases": [f"Original fictional observatory story {i} for a synthetic experiment." for i in range(6)]}
+        def fake_text(card, prompt, dependencies, directory, key=""):
+            directory.mkdir(parents=True, exist_ok=True)
+            path = directory/"content.md"
+            path.write_text(json.dumps(value) if "Format: research;" in prompt else "Original synthetic review output.")
+            return path
+        review = {"note": "Read the original evidence and checked the quoted claim.", "license_review": "Original fixture only, no outside code or assets imported.", "compatibility_review": "An editorial instruction only, no executable operations.", "cases_authorized": True}
+        with patch.object(adapters, "execute", fake_text):
+            self.run_action(created["run_id"])
+            self.api("POST", f"/api/runs/{created['run_id']}/approve", {})
+            self.assertEqual(self.api("GET", "/api/labs/http-lab/draft")["title"], value["title"])
+            self.api("POST", "/api/labs/http-lab/accept", {"technique": "http-method", "review": review})
+            self.assertEqual(self.request("POST", "/api/labs/http-lab/promote", {})[0], 409)
+            trial = self.api("POST", "/api/labs/http-lab/experiment", {"settings": {"total_budget": 1, "local_only": True, "max_latency": 300}})
+            heldout = next(c for c in trial["cases"] if c["partition"] == "holdout")
+            self.assertEqual(self.request("POST", f"/api/labs/http-lab/cases/{heldout['id']}/baseline", {}, {"Idempotency-Key": uuid.uuid4().hex})[0], 409)
+            for partition in ["development", "holdout"]:
+                for case in trial["cases"]:
+                    if case["partition"] != partition: continue
+                    base = f"/api/labs/http-lab/cases/{case['id']}"
+                    for arm in ["baseline", "candidate"]:
+                        action_key = uuid.uuid4().hex
+                        action = self.api("POST", base+"/"+arm, {}, {"Idempotency-Key": action_key})
+                        duplicate = self.api("POST", base+"/"+arm, {}, {"Idempotency-Key": action_key})
+                        self.assertEqual(action["id"], duplicate["id"])
+                        for _ in range(100):
+                            status = self.api("GET", "/api/actions/"+action["id"])
+                            if status["status"] not in {"queued", "running"}: break
+                            time.sleep(0.01)
+                        self.assertEqual(status["status"], "done")
+                    self.assertEqual(self.request("GET", base+"/A", auth=False)[0], 401)
+                    self.assertEqual(self.request("GET", base+"/A")[0], 200)
+                    status, headers, raw = self.request("GET", base+"/packet")
+                    self.assertEqual(status, 200)
+                    with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+                        self.assertEqual(set(archive.namelist()), {"A.md", "B.md", "review.json"})
+                        self.assertNotIn("lab-writer", archive.read("review.json").decode())
+                    internal = next(c for c in self.server.app.lab.benchmarks._load(trial["id"])["cases"] if c["id"] == case["id"])
+                    scores = {label: (0.8 if arm == "candidate" else 0.5) for label, arm in zip(["A", "B"], json.loads(internal["display_order"]))}
+                    body = {"scores": scores, "rationale": "Synthetic scores test only the held-out review mechanism."}
+                    self.api("POST", base+"/review", body)
+                    self.assertEqual(self.request("POST", base+"/review", body)[0], 409)
+                    self.api("POST", base+"/approve", {})
+                if partition == "development": self.api("POST", "/api/labs/http-lab/seal", {})
+            self.assertTrue(self.api("POST", "/api/labs/http-lab/evaluate", {})["passed"])
+            active = self.api("POST", "/api/labs/http-lab/promote", {})
+            self.assertEqual(active["technique_state"], "active")
+            self.assertEqual(self.api("POST", "/api/labs/http-lab/rollback", {})["technique_state"], "retired")
+        self.assertEqual(len(self.api("GET", "/api/research")["labs"]), 1)
+        self.assertEqual(self.api("GET", "/api/research?profile=other")["labs"], [])

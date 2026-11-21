@@ -27,6 +27,7 @@ from .learning import Learning
 from .library import Library
 from .locking import run_lock
 from .research import Research
+from .lab import Lab, creative_tasks
 from .series import Series
 from .mediaflow import MediaFlow
 from .timeline import Timeline
@@ -60,6 +61,7 @@ class Workbench:
         self.series = Series(store, self.engine)
         self.coach = Coach(store, self.engine)
         self.research = Research(store, Learning(store, self.engine))
+        self.lab = Lab(store, cards)
         self.timeline = Timeline(store)
         self.assets = Assets(store)
         self.music = Music(store, cards)
@@ -94,10 +96,10 @@ class Workbench:
             db.execute("INSERT INTO web_submissions VALUES(?,?,?)", (key, draft_id, run_id))
         return {"run": run_id}
 
-    def action(self, run_id, operation, key):
+    def action(self, run_id, operation, key, driver=None):
         identifier(key)
         self.store.run(run_id)
-        if operation not in {"execute", "resume"}:
+        if operation not in {"execute", "resume"} and not (driver and operation in {"experiment_baseline", "experiment_candidate"}):
             raise ValueError("Unknown execution operation")
         with self.store.connect() as db:
             db.execute("BEGIN IMMEDIATE")
@@ -107,14 +109,14 @@ class Workbench:
                     raise ValueError("Action key was used for another operation")
                 return dict(prior)
             db.execute("INSERT INTO web_actions VALUES(?,?,?,'queued',NULL)", (key, run_id, operation))
-        self.pool.submit(self._execute, key, run_id, operation)
+        self.pool.submit(self._execute, key, run_id, operation, driver)
         return {"id": key, "status": "queued"}
 
-    def _execute(self, key, run_id, operation):
+    def _execute(self, key, run_id, operation, driver=None):
         with self.store.connect() as db:
             db.execute("UPDATE web_actions SET status='running' WHERE id=?", (key,))
         try:
-            getattr(self.engine, operation)(run_id)
+            driver() if driver else getattr(self.engine, operation)(run_id)
             state, error = "done", None
         except Exception:
             state, error = "error", "执行已停止。已有产物和远端凭据已保留，请查看任务状态。"
@@ -270,6 +272,9 @@ class Workbench:
             run = self.store.run(run_id)
             with self.store.connect() as db:
                 run["events"] = [{**dict(r), "payload": json.loads(r["payload"])} for r in db.execute("SELECT kind,payload,created FROM events WHERE subject=? ORDER BY id DESC LIMIT 30", (run_id,))]
+                if run["plan"].get("benchmark"):
+                    trial = db.execute("SELECT protocol FROM benchmarks WHERE id=?", (run["plan"]["benchmark"]["id"],)).fetchone()
+                    run["experiment_lab"] = json.loads(trial["protocol"]).get("lab") if trial else None
                 run["actions"] = [dict(r) for r in db.execute("SELECT * FROM web_actions WHERE run_id=? ORDER BY rowid DESC LIMIT 10", (run_id,))]
             return run
         if path.startswith("/api/actions/"):
@@ -292,10 +297,43 @@ class Workbench:
         if path.startswith("/api/series/"):
             return self.series.inspect(path.rsplit("/", 1)[-1])
         if path == "/api/research":
-            return {"items": self.research.inbox("all")[:200], "sources": self.research.sources()}
+            return {"items": self.research.inbox("all")[:200], "sources": self.research.sources(), "labs": self.lab.list(profile), "tasks": list(creative_tasks())}
+        match = re.fullmatch(r"/api/labs/([A-Za-z0-9_-]+)(/draft)?", path)
+        if match:
+            return self.lab.draft(match[1]) if match[2] else self.lab.inspect(match[1])
         raise ValueError("Unknown endpoint")
 
     def post(self, path, body, key):
+        if path == "/api/labs":
+            identifier(key)
+            return self.lab.create(body["id"], body["spec"], key)
+        match = re.fullmatch(r"/api/labs/([A-Za-z0-9_-]+)/(accept|experiment|evaluate|promote|rollback|seal)", path)
+        if match:
+            name, operation = match.groups()
+            if operation == "accept":
+                return self.lab.accept(name, body["technique"], body["review"])
+            if operation == "experiment":
+                return self.lab.experiment(name, body["settings"])
+            if operation == "evaluate":
+                return self.lab.evaluate(name)
+            if operation in {"promote", "rollback"}:
+                return self.lab.activate(name, rollback=operation == "rollback")
+            trial = self.lab.trial(name)
+            return self.lab.benchmarks.seal_development(trial["id"])
+        match = re.fullmatch(r"/api/labs/([A-Za-z0-9_-]+)/cases/([A-Za-z0-9_-]+)/(baseline|candidate|review|approve)", path)
+        if match:
+            name, case_id, operation = match.groups()
+            trial = self.lab.trial(name)
+            case = next((c for c in trial["cases"] if c["id"] == case_id), None)
+            if not case:
+                raise ValueError("Unknown experiment case")
+            if operation == "approve":
+                return self.lab.approve_case(name, case_id)
+            if operation == "review":
+                return self.lab.benchmarks.review(trial["id"], case_id, body["scores"], body["rationale"])
+            self.lab.benchmarks.accessible(trial, case)
+            return self.action(case[operation+"_run"], "experiment_"+operation, key,
+                               driver=lambda: self.lab.benchmarks.generate(trial["id"], case_id, operation))
         if path == "/api/assets":
             identifier(key)
             raw = base64.b64decode(body["data"], validate=True)
@@ -466,10 +504,10 @@ class Handler(BaseHTTPRequestHandler):
             if self.headers.get("Host") != urlsplit(self.server.origin).netloc:
                 return self.respond(403, {"error": "只允许本机工作台访问。"})
             parsed = urlsplit(self.path)
-            if parsed.path in {"/", "/app.js", "/app.css", "/timeline.js", "/media.js"}:
-                name = {"/": "index.html", "/app.js": "app.js", "/app.css": "app.css", "/timeline.js": "timeline.js", "/media.js": "media.js"}[parsed.path]
+            if parsed.path in {"/", "/app.js", "/app.css", "/timeline.js", "/media.js", "/lab.js"}:
+                name = {"/": "index.html", "/app.js": "app.js", "/app.css": "app.css", "/timeline.js": "timeline.js", "/media.js": "media.js", "/lab.js": "lab.js"}[parsed.path]
                 raw = (Path(__file__).parent/"static"/name).read_bytes()
-                mime = {"index.html": "text/html", "app.js": "text/javascript", "app.css": "text/css", "timeline.js": "text/javascript", "media.js": "text/javascript"}[name]
+                mime = {"index.html": "text/html", "app.js": "text/javascript", "app.css": "text/css", "timeline.js": "text/javascript", "media.js": "text/javascript", "lab.js": "text/javascript"}[name]
                 self.headers_for(200, mime+"; charset=utf-8", len(raw))
                 return self.wfile.write(raw)
             if not self.trusted():
@@ -478,6 +516,22 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond(401, {"error": "请输入本机工作台访问码。"})
             if parsed.path == "/api/session":
                 return self.respond(200, {"authenticated": True})
+            match = re.fullmatch(r"/api/labs/([A-Za-z0-9_-]+)/cases/([A-Za-z0-9_-]+)/(A|B|packet)", parsed.path)
+            if match:
+                name, case_id, label = match.groups()
+                trial = self.server.app.lab.trial(name)
+                bench = self.server.app.lab.benchmarks
+                if label == "packet":
+                    raw = bench.packet_bytes(trial["id"], case_id)
+                    self.headers_for(200, "application/zip", len(raw), {"Content-Disposition": 'attachment; filename="creator-loom-blind-review.zip"'})
+                    return self.wfile.write(raw)
+                target = bench.target_artifact(trial["id"], case_id, label)
+                if target.suffix == ".ppm":
+                    raw = timeline_media.command(["ffmpeg", "-nostdin", "-v", "error", "-protocol_whitelist", "file,pipe", "-format_whitelist", "ppm_pipe", "-i", str(target), "-frames:v", "1", "-vf", "scale=640:360:force_original_aspect_ratio=decrease,setsar=1", "-map_metadata", "-1", "-f", "image2pipe", "-c:v", "png", "-threads", "1", "pipe:1"], timeout=20)
+                    bench.target_artifact(trial["id"], case_id, label)
+                    self.headers_for(200, "image/png", len(raw))
+                    return self.wfile.write(raw)
+                return self.stream_file(target)
             match = re.fullmatch(r"/api/assets/([A-Za-z0-9_-]+)/export", parsed.path)
             if match:
                 raw = self.server.app.assets.bundle(match[1])

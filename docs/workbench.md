@@ -23,7 +23,7 @@ Text is displayed as text, not executed Markdown/HTML. Media previews use authen
 
 The book shelf imports TXT/unencrypted EPUB with explicit source-rights declarations and an eight-megabyte upload limit. It uses generic temporary names, not the original local filename/path. Inspect source units before creating a series. Series planning and acceptance retain the existing optimistic continuity versions and artifact-bound review.
 
-The learning radar shows subscribed sources, literal keyword evidence and preserved review states. It can turn reviewed evidence into a proposed editorial method, but cannot bypass paired evaluation or activate it. Subscription configuration, evaluation/activation, broader editing and some recovery operations remain available through the CLI.
+The learning radar shows subscribed sources, literal keyword evidence and preserved review states. It can turn reviewed evidence into a proposed editorial method, but cannot bypass paired evaluation or activate it. Selected-evidence synthesis can plan a grounded suggestion and preassigned development/holdout experiment, with immutable blind scores, final artifact approval and explicit task-scoped activation/rollback. Existing manual proposal evaluation and subscription configuration also remain available through the CLI. See [research lab](research-lab.md).
 
 Completed works offer medium-specific review questions. The browser revision editor currently supports text steps; it records an actually changed draft, dimension, before/after self-ratings and a rationale. Other media retain review questions and ordinary feedback. Progress is self-reported, not proof of independently measured skill gains.
 

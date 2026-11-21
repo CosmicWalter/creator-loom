@@ -65,3 +65,7 @@ loom benchmark-calibrate writing-trial
 A/B 隐藏只作用于评审展示。本机所有者能读取状态库及冻结计划，生成内容也可能自行提及模型身份；系统没有安全隔离评审者，也不能证明评审独立或选题互不相关。不同标题不保证内容独立。测试中的产物与评分都是模拟数据，没有真实模型排名或创作者技能提升结论。
 
 分享评审包前，应核实源内容授权并检查创作文本、音视频和内嵌元数据。剔除操作记录和中和 ZIP 时间戳并不会清除模型生成文件自身可能携带的信息；评审包不会自动上传。该版本没有工作台评测界面，也未完成浏览器视觉验收。
+
+## Technique experiments
+
+Research-lab trials reuse the same blind/holdout storage and generation gates with `kind: technique`. Their paired models stay identical; only target editorial guidance changes. Such trials cannot call `benchmark-calibrate`: their held-out scores inform technique evaluation only. See [research lab](research-lab.md).

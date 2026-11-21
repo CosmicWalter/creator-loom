@@ -11,6 +11,7 @@ const watchedActions = new Set();
 const formats = {
   article: "文章",
   song: "歌词与音乐方案",
+  research: "资料综合提案",
   novel: "小说改编",
   cover: "本地图形封面",
   podcast: "播客口播",
@@ -30,6 +31,7 @@ const statuses = {
 const stages = {
   draft: "文章",
   lyrics: "歌词方案",
+  synthesis: "证据综合",
   direction: "音乐方向",
   imported: "授权导入",
   outline: "故事大纲",
@@ -278,7 +280,7 @@ function createView() {
   topic.placeholder =
     "例如：一张关于海边阅读时光的封面，安静、简洁，有一点探索的感觉。";
   topic.maxLength = 10000;
-  const format = select(Object.entries(formats), "cover"),
+  const format = select(Object.entries(formats).filter(([id]) => id !== "research"), "cover"),
     language = select([
       ["zh", "中文"],
       ["en", "English"],
@@ -537,7 +539,7 @@ async function openRun(id) {
   );
   if (active) watchAction(active.id, id);
   const tools = node("div", "toolbar");
-  if (run.status === "ready")
+  if (run.status === "ready" && !run.plan.benchmark)
     tools.append(
       button("开始制作 ↗", () => startAction(id, "execute"), "primary"),
     );
@@ -560,6 +562,7 @@ async function openRun(id) {
     link.href = "/api/export/" + id;
     tools.append(link);
   }
+  if (run.experiment_lab) tools.append(button("返回配对实验", () => openLab(run.experiment_lab)));
   tools.append(button("刷新", () => openRun(id)));
   add(titleBlock, heading, tools);
   root.append(titleBlock);
@@ -587,6 +590,7 @@ async function openRun(id) {
         ),
       ),
     );
+    if (s.editorial_technique) p.append(node("p", "mini-note", "本步骤编辑方法："+s.editorial_technique));
     if (saved.result) {
       const base = `/api/artifacts/${id}/${s.id}/`,
         artifact = node("div", "artifact");
@@ -624,7 +628,7 @@ async function openRun(id) {
       a.rel = "noreferrer";
       links.append(a);
       add(p, artifact, links);
-      if (["needs_review", "approved"].includes(run.status)) {
+      if (["needs_review", "approved"].includes(run.status) && !run.plan.benchmark) {
         const rating = node("div", "feedback");
         rating.append(node("span", "subtle", "这一步的效果："));
         for (let value = 1; value <= 5; value++)
@@ -1013,7 +1017,7 @@ async function seriesDialog(book) {
 }
 async function researchView() {
   const root = $("#content"),
-    data = await api("/api/research");
+    data = await api("/api/research?profile="+encodeURIComponent(state.profile));
   add(
     root,
     title(
@@ -1022,6 +1026,14 @@ async function researchView() {
       "保留来源与修订记录；新资料经过评审和实验后，才影响未来创作。",
     ),
   );
+  const labs = panel("模型辅助研究与实验"), labCards = node("div", "cards");
+  for (const lab of data.labs) {
+    const card = button("", () => openLab(lab.id), "work-card");
+    add(card, node("h3", "", lab.protocol.goal), node("p", "", lab.protocol.task), chip(lab.technique_state === "active" ? "当前方法根" : lab.evaluation ? "已有留出集评估" : lab.accepted ? "已审核提案" : statuses[lab.run_status] || lab.run_status));
+    labCards.append(card);
+  }
+  labs.append(data.labs.length ? labCards : empty("从下面一条公开资料选择「模型辅助整理」。模型建议仍需引用核对、许可/兼容性评审和独立留出集实验。"));
+  root.append(labs);
   const sources = panel("已订阅的公开来源");
   for (const source of data.sources)
     add(
@@ -1070,6 +1082,7 @@ async function researchView() {
         add(
           node("div", "toolbar"),
           button("整理为实验提案", () => proposalDialog(item)),
+          button("模型辅助整理", () => labDialog(item, data.items, data.tasks)),
         ),
       );
     root.append(p);
@@ -1176,6 +1189,8 @@ $(".brand").onclick = (e) => {
 $("#refresh").onclick = () =>
   state.view === "detail"
     ? openRun(state.run).catch((e) => toast(e.message))
+    : state.view === "lab-detail"
+      ? openLab(labUI.id).catch(e => toast(e.message))
     : state.view === "music-detail"
       ? openMusic(mediaUI.project).catch(e => toast(e.message))
     : state.view === "timeline-detail"
@@ -1184,7 +1199,7 @@ $("#refresh").onclick = () =>
         ? renderTimelineEditor()
         : navigate(state.view).catch((e) => toast(e.message));
 $("#profile").onchange = () =>
-  navigate(state.view === "detail" ? "runs" : state.view.startsWith("timeline") ? "timelines" : state.view === "music-detail" ? "assets" : state.view).catch((e) =>
+  navigate(state.view === "detail" ? "runs" : state.view.startsWith("timeline") ? "timelines" : state.view === "music-detail" ? "assets" : state.view === "lab-detail" ? "research" : state.view).catch((e) =>
     toast(e.message),
   );
 document

@@ -74,3 +74,7 @@ Use `create --technique ID` for controlled experimental runs, then the same pair
 ## Validation scope
 
 Fixture tests cover RSS/Atom parsing, canonical links, bounded curl behavior, DTD rejection, failed-source isolation, polling leases, expiry/configuration races, persistence, deduplication, stale reviews and atomic evidence-linked proposals through the existing activation gate. A live public ComfyUI release feed was collected with verified TLS using curl and then collected again without duplicate items. That live check validates transport and metadata ingestion, not the scientific or creative value of the release notes.
+
+## Model-assisted synthesis
+
+The workbench now offers an explicit selected-evidence synthesis and held-out editorial experiment flow. See [research lab](research-lab.md). Existing hand-written proposals remain available; model-generated suggestions still require artifact, source, license and compatibility review and cannot execute code or activate themselves.

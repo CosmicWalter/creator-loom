@@ -38,7 +38,8 @@ This is a delivery backlog, not a promise that the complete product is already a
 
 - [x] Saved public source subscriptions, literal keyword triage, deduplicated/versioned evidence and reviewed proposal inbox.
 - [x] Foreground due-source collector with leases, persistent intervals and isolated source failures.
-- [ ] Semantic technique synthesis, license/compatibility review and automated experiment proposals beyond editorial guidance.
+- [x] Model-assisted feed-summary synthesis, exact evidence quotations, human license/compatibility review and planned held-out task-scoped editorial experiments (synthetic protocol/HTTP verified).
+- [ ] Full-source semantic research, real creative-quality validation and techniques beyond bounded editorial instructions.
 - [ ] Sandboxed adapter/recipe proposals; regression suites, signed releases and reversible migrations.
 - [x] CLI task-isolated A/B review protocol, preassigned holdout briefs and explicit holdout-only quality calibration (synthetic protocol verification).
 - [ ] Independently conducted real-provider blind reviews and budget-matched comparisons.
