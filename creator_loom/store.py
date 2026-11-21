@@ -89,8 +89,13 @@ class Store:
                 CREATE TABLE IF NOT EXISTS web_actions (
                   id TEXT PRIMARY KEY, run_id TEXT NOT NULL, operation TEXT NOT NULL,
                   status TEXT NOT NULL, error TEXT);
+                CREATE TABLE IF NOT EXISTS web_timeline_mutations (
+                  id TEXT PRIMARY KEY, fingerprint TEXT NOT NULL, timeline_id TEXT NOT NULL, version INTEGER NOT NULL);
+                CREATE TABLE IF NOT EXISTS web_timeline_actions (
+                  id TEXT PRIMARY KEY, timeline_id TEXT NOT NULL, version INTEGER NOT NULL,
+                  status TEXT NOT NULL, error TEXT);
                 CREATE TABLE IF NOT EXISTS timelines (
-                  id TEXT PRIMARY KEY, current_version INTEGER NOT NULL,
+                  id TEXT PRIMARY KEY, current_version INTEGER NOT NULL, profile TEXT NOT NULL DEFAULT 'default',
                   created TEXT DEFAULT CURRENT_TIMESTAMP);
                 CREATE TABLE IF NOT EXISTS timeline_versions (
                   timeline_id TEXT NOT NULL, version INTEGER NOT NULL, spec TEXT NOT NULL,
@@ -110,6 +115,8 @@ class Store:
                   PRIMARY KEY(benchmark_id,id));
             ''')
             db.execute("BEGIN IMMEDIATE")
+            if "profile" not in {r[1] for r in db.execute("PRAGMA table_info(timelines)")}:
+                db.execute("ALTER TABLE timelines ADD COLUMN profile TEXT NOT NULL DEFAULT 'default'")
             if "transport" not in {r[1] for r in db.execute("PRAGMA table_info(subscriptions)")}:
                 db.execute("ALTER TABLE subscriptions ADD COLUMN transport TEXT NOT NULL DEFAULT 'urllib'")
 

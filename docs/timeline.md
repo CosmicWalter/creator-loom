@@ -2,6 +2,8 @@
 
 The CLI timeline turns approved creative artifacts into an editable multi-shot film. It supports cuts between still images or video clips, center zoom on still images, one narration track, an optional music track, and explicit selectable subtitles. It runs locally with FFmpeg/FFprobe; it does not call a generative-video model.
 
+For a form-based editor, run `loom serve --open` and choose **剪辑台**. The same version/review/render constraints apply. The CLI below remains useful for reproducible edit files.
+
 ## Prepare sources and an edit
 
 Use normal creation recipes, inspect the actual artifacts, and approve the source runs. Inspect each run to obtain its step ID and artifact `file` value. Only reviewed PNG/PPM images, MP4 video and PCM-compatible WAV audio are accepted; raw file paths, network URLs and unreviewed outputs are rejected. This release reuses creation artifacts rather than importing arbitrary external media. Confirm rights to the content and music before reuse.
@@ -58,4 +60,4 @@ Export requires final approval and verifies both source and output hashes. The Z
 
 ## Verification and limits
 
-Tests use original synthetic images and sine-wave audio with actual FFmpeg: cuts are checked by decoded frame colors, zoom by changing decoded frames, audio mixing and looping by decoded frequencies, captions by actual stream presence, and source tags by inspection of the final container. Model inference is simulated; this is media execution evidence, not creative-quality evidence. A workbench timeline editor and browser/visual acceptance are still pending.
+Tests use original synthetic images and sine-wave audio with actual FFmpeg: cuts are checked by decoded frame colors, zoom by changing decoded frames, audio mixing and looping by decoded frequencies, captions by actual stream presence, and source tags by inspection of the final container. Model inference is simulated; this is media execution evidence, not creative-quality evidence. The workbench now exposes source selection, shot/timing/sound/caption editing, review, rendering and delivery; see [the editing room](workbench.md#editing-room). HTTP/media execution is verified; browser/visual acceptance remains pending.

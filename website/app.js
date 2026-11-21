@@ -6,7 +6,7 @@ const demos = {
     description: "把已授权的章节变成口播稿、封面、配音和视频。上下文与连续性说明随计划保存，审核后再进入下一集。",
     link: "docs/books-and-series.md", linkText: "了解连续创作",
     steps: [["文稿改编", "文字模型 · 任务与来源"], ["封面设计", "图像模型或本地图形工具"], ["生成旁白", "语音服务 · 音色授权"], ["视频合成", "本机 FFmpeg · 审核交付"]],
-    boundary: "当前配方输出静态配图视频；多镜头剪辑通过 CLI 时间线完成。",
+    boundary: "当前配方输出静态配图视频；多镜头剪辑可通过本机剪辑台或 CLI 时间线完成。",
   },
   writing: {
     kind: "文字创作 · ARTICLE / NOVEL",
@@ -25,12 +25,12 @@ const demos = {
     boundary: "本地封面是模板图形设计，不是 AI 绘画。ComfyUI、角色参考一致性与生成式视频尚未接入。",
   },
   edit: {
-    kind: "本机剪辑 · TIMELINE CLI",
+    kind: "本机剪辑 · EDITING ROOM",
     title: ["让每个镜头，", "接住下一句话。"],
     description: "把已审核的图片、视频与音频排成有节奏的作品。裁切视频入点、加入图片缩放、混合旁白与音乐，为明确的时刻写上字幕。",
-    link: "docs/timeline.md", linkText: "了解时间线 CLI",
+    link: "docs/timeline.md", linkText: "了解剪辑台与时间线",
     steps: [["引用已审核素材", "图片 · 片段 · WAV 音轨"], ["安排镜头与字幕", "时长 · 入点 · 缩放 · 音量"], ["逐镜头审核封存", "修改保留历史版本"], ["本机制作与成片审核", "MP4 · SRT · 编辑清单"]],
-    boundary: "当前通过 CLI 和 JSON 编辑；网页时间线仍待实现。字幕为编辑者提供的时间，不是自动语音对齐。",
+    boundary: "本机剪辑台提供镜头列表、时长与音轨表单，仍待浏览器交互验收。字幕为编辑者提供的时间，不是自动语音对齐。",
   },
 };
 const tabs = [...document.querySelectorAll("[data-demo]")];

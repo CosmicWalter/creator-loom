@@ -27,10 +27,11 @@ This is a delivery backlog, not a promise that the complete product is already a
 - [ ] ComfyUI adapter, MediaFlow transcription delivery and additional asynchronous model providers.
 - [x] Bounded TXT/unencrypted EPUB import, chapter/unit provenance and reviewed sequential creation with frozen continuity notes.
 - [x] Versioned CLI edit lists, per-shot review, sealed rendering and final approval over hash-bound sources.
-- [ ] Rich character memory, automatic continuity proposals and a workbench timeline editor.
+- [x] Workbench shot-list timeline editing, source/media previews, sound/caption controls, version review and background render/delivery (HTTP/media execution verified).
+- [ ] Rich character memory, automatic continuity proposals and direct-manipulation multi-track editing.
 - [x] Authenticated loopback workbench, frozen plan confirmation, artifact preview/review and structured deliverable export.
 - [x] Workbench book import, sequential creation, research inbox and text revision practice backed by existing APIs.
-- [ ] Browser interaction/visual acceptance and further usability iteration; generalized media asset library and timeline editing.
+- [ ] Browser interaction/visual acceptance and further usability iteration; generalized rights-aware media asset library.
 
 ## Learning system and open benchmark
 
@@ -53,5 +54,5 @@ This is a delivery backlog, not a promise that the complete product is already a
 ## Public experience and music workflows
 
 - [x] Publish the project website to this repository's `gh-pages` branch; deployment and public asset hashes verified. Responsive styles exist; browser/mobile acceptance remains pending.
-- [ ] Friendly workbench timeline editing and verified browser/mobile interaction flows.
+- [ ] Verify browser/mobile interaction and usability of the implemented workbench timeline editor.
 - [ ] Rights-aware Suno adaptation workflow, explicit human handoff and verified receipt/import boundaries.

@@ -131,3 +131,12 @@ def render(spec, sources, directory):
     if (bool(audio_inputs) != ("audio" in kinds)) or (bool(captions) != ("subtitle" in kinds)):
         raise ValueError("Final film is missing a requested media track")
     return ["film.mp4"] + (["captions.srt"] if captions else [])
+
+
+def vtt(captions):
+    def stamp(value):
+        seconds, millis = divmod(round(value*1000), 1000)
+        minutes, second = divmod(seconds, 60)
+        hours, minute = divmod(minutes, 60)
+        return f"{hours:02d}:{minute:02d}:{second:02d}.{millis:03d}"
+    return "WEBVTT\n\n" + "\n\n".join(f"{stamp(c['start'])} --> {stamp(c['end'])}\n{c['text']}" for c in captions) + "\n"

@@ -128,13 +128,30 @@ class Timeline:
         return {"title": spec["title"].strip(), "width": width, "height": height, "fps": fps,
                 "duration": seconds, "shots": shots, **tracks, "captions": captions}
 
-    def create(self, name, spec):
-        identifier(name)
+    def mutation(self, db, key, payload, version=None):
+        if key is None:
+            return None
+        identifier(key)
+        fingerprint = hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
+        if version is None:
+            prior = db.execute("SELECT * FROM web_timeline_mutations WHERE id=?", (key,)).fetchone()
+            if prior and prior["fingerprint"] != fingerprint:
+                raise ValueError("Timeline request key was used for another edit")
+            return prior["version"] if prior else None
+        db.execute("INSERT INTO web_timeline_mutations VALUES(?,?,?,?)", (key, fingerprint, payload["id"], version))
+
+    def create(self, name, spec, profile="default", request_key=None):
+        identifier(name); identifier(profile)
         normalized = self.normalize(spec)
         with self.lock(name), self.store.connect() as db:
             db.execute("BEGIN IMMEDIATE")
-            db.execute("INSERT INTO timelines(id,current_version) VALUES(?,1)", (name,))
+            payload = {"operation": "create", "id": name, "spec": normalized, "profile": profile}
+            prior = self.mutation(db, request_key, payload)
+            if prior is not None:
+                return self.inspect(name, prior)
+            db.execute("INSERT INTO timelines(id,current_version,profile) VALUES(?,1,?)", (name, profile))
             db.execute("INSERT INTO timeline_versions(timeline_id,version,spec,state) VALUES(?,1,?,'draft')", (name, json.dumps(normalized)))
+            self.mutation(db, request_key, payload, 1)
             self.store.event(db, "timeline_created", name, {"version": 1})
         return self.inspect(name)
 
@@ -150,24 +167,31 @@ class Timeline:
             row = db.execute("SELECT * FROM timeline_versions WHERE timeline_id=? AND version=?", (name, version)).fetchone()
             if not row:
                 raise ValueError("Unknown timeline version")
+            versions = [dict(r) for r in db.execute("SELECT version,state FROM timeline_versions WHERE timeline_id=? ORDER BY version DESC", (name,))]
             reviews = [dict(r) for r in db.execute("SELECT shot_id,decision,note FROM shot_reviews WHERE timeline_id=? AND version=?", (name, version))]
         return {"id": name, "version": version, "current_version": timeline["current_version"], "state": row["state"],
+                "profile": timeline["profile"], "versions": versions,
                 "spec": json.loads(row["spec"]), "reviews": reviews, "outputs": json.loads(row["outputs"]) if row["outputs"] else None}
 
     def require_current(self, timeline, version):
         if type(version) is not int or version != timeline["current_version"]:
             raise ValueError("Timeline changed; inspect the current version before editing or reviewing")
 
-    def revise(self, name, spec, version):
+    def revise(self, name, spec, version, request_key=None):
         normalized = self.normalize(spec)
         with self.lock(name), self.store.connect() as db:
             db.execute("BEGIN IMMEDIATE")
+            payload = {"operation": "revise", "id": name, "version": version, "spec": normalized}
+            prior = self.mutation(db, request_key, payload)
+            if prior is not None:
+                return self.inspect(name, prior)
             current = self.inspect(name)
             self.require_current(current, version)
             # Holding the OS lock proves an old rendering worker is no longer live.
             db.execute("UPDATE timeline_versions SET state='interrupted' WHERE timeline_id=? AND state='rendering'", (name,))
             db.execute("UPDATE timelines SET current_version=? WHERE id=?", (version+1, name))
             db.execute("INSERT INTO timeline_versions(timeline_id,version,spec,state) VALUES(?,?,?,'draft')", (name, version+1, json.dumps(normalized)))
+            self.mutation(db, request_key, payload, version+1)
             self.store.event(db, "timeline_revised", name, {"version": version+1})
         return self.inspect(name)
 
@@ -181,6 +205,11 @@ class Timeline:
             if timeline["state"] != "draft" or shot not in {s["id"] for s in timeline["spec"]["shots"]}:
                 raise ValueError("Only draft shots can be reviewed")
             self.verify_sources(timeline)
+            prior = db.execute("SELECT decision,note FROM shot_reviews WHERE timeline_id=? AND version=? AND shot_id=?", (name, version, shot)).fetchone()
+            if prior:
+                if prior["decision"] != decision or prior["note"] != note:
+                    raise ValueError("Shot decision is immutable; revise the edit")
+                return timeline
             db.execute("INSERT INTO shot_reviews VALUES(?,?,?,?,?,CURRENT_TIMESTAMP)", (name, version, shot, decision, note))
             self.store.event(db, "shot_reviewed", name, {"version": version, "shot": shot, "decision": decision})
         return self.inspect(name)
@@ -189,7 +218,12 @@ class Timeline:
         refs = [(s["source"], "visual") for s in timeline["spec"]["shots"]]
         refs += [(timeline["spec"][k]["source"], "audio") for k in ["narration", "music"] if timeline["spec"][k]]
         result = {}
+        verified = set()
         for ref, kind in refs:
+            key = json.dumps([ref, kind], sort_keys=True)
+            if key in verified:
+                continue
+            verified.add(key)
             _, path, _ = self.reference(ref, kind)
             result[ref["sha256"]] = path
         return result
@@ -199,6 +233,9 @@ class Timeline:
             db.execute("BEGIN IMMEDIATE")
             timeline = self.inspect(name)
             self.require_current(timeline, version)
+            if timeline["state"] == "sealed":
+                self.verify_sources(timeline)
+                return timeline
             if timeline["state"] != "draft" or {r["shot_id"] for r in timeline["reviews"] if r["decision"] == "approve"} != {s["id"] for s in timeline["spec"]["shots"]}:
                 raise ValueError("Approve every shot before sealing the edit")
             self.verify_sources(timeline)
@@ -278,6 +315,9 @@ class Timeline:
             db.execute("BEGIN IMMEDIATE")
             timeline = self.inspect(name)
             self.require_current(timeline, version)
+            if timeline["state"] == "approved":
+                self.verify_outputs(timeline)
+                return timeline
             if timeline["state"] != "needs_review":
                 raise ValueError("Only a finished timeline can be approved")
             self.verify_outputs(timeline)
@@ -285,7 +325,7 @@ class Timeline:
             self.store.event(db, "timeline_approved", name, {"version": version, "outputs": timeline["outputs"]})
         return self.inspect(name)
 
-    def export(self, name, version=None):
+    def bundle(self, name, version=None):
         timeline = self.inspect(name, version)
         if timeline["state"] != "approved":
             raise ValueError("Approve the rendered timeline before exporting")
@@ -297,8 +337,13 @@ class Timeline:
                 info.create_system = 0
                 info.compress_type = zipfile.ZIP_DEFLATED
                 archive.writestr(info, (self.directory(name, timeline["version"])/output["file"]).read_bytes())
+        return stream.getvalue()
+
+    def export(self, name, version=None):
+        timeline = self.inspect(name, version)
+        raw = self.bundle(name, timeline["version"])
         directory = self.store.root/"timeline_exports"
         directory.mkdir(exist_ok=True)
         path = directory/(name+"-"+str(timeline["version"])+".zip")
-        path.write_bytes(stream.getvalue())
+        path.write_bytes(raw)
         return {"file": str(path), "version": timeline["version"], "uploaded": False}

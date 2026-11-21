@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.10.0
+
+- Add a local workbench editing room for approved source selection, actual image/media previews, shot reordering, timing/crop settings, narration/music controls and caption entry without hand-written JSON.
+- Connect immutable edit revisions, per-shot review, sealing, background rendering, final playback/review and verified ZIP delivery through authenticated HTTP endpoints. Preview captions as derived WebVTT without altering exported SRT.
+- Persist idempotent save/render intents, preserve old versions and interrupted actions, reject stale queued renders, and retain source/output hash checks throughout preview and delivery.
+- Organize timelines by preference profile; migrate older timelines to `default`. Profiles remain organization/preferences, not separate user authorization.
+- Add real HTTP and FFmpeg execution coverage, JavaScript syntax and packaged editor asset checks. Browser interaction, mobile layout and visual acceptance remain pending.
+
 ## 0.9.0
 
 - Add a responsive buildless public website with explicitly illustrative workflow exploration, local installation onboarding and capability/roadmap boundaries. Publish through an identity-checked, allowlisted `gh-pages` branch; browser acceptance remains pending.

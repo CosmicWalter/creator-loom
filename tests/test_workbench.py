@@ -5,6 +5,8 @@ import hashlib
 import http.client
 import io
 import json
+import shutil
+import sqlite3
 import tempfile
 import threading
 import time
@@ -278,3 +280,144 @@ class WorkbenchTest(unittest.TestCase):
         context = self.api("GET", "/api/runs/"+next_run)["plan"]["context"]
         self.assertEqual(context["source"]["index"], 1)
         self.assertIn("observed a signal", context["continuity"])
+
+    def timeline_fixture(self, name="edit"):
+        self.login()
+        _, run = self.cover()
+        self.run_action(run)
+        self.api("POST", f"/api/runs/{run}/approve", {})
+        assets = self.api("GET", "/api/timeline-assets?profile=default")["assets"]
+        source = next(a for a in assets if a["ref"]["run"] == run)
+        spec = {"title": "Original HTTP edit", "width": 640, "height": 360, "fps": 24,
+                "shots": [{"id": "opening", "source": source["ref"], "duration": 0.5}],
+                "captions": [{"start": 0, "end": 0.5, "text": "An original cue, with a comma."}]}
+        key = uuid.uuid4().hex
+        timeline = self.api("POST", "/api/timelines", {"id": name, "spec": spec, "profile": "default"}, {"Idempotency-Key": key})
+        return timeline, source, key
+
+    @unittest.skipUnless(shutil.which("ffmpeg") and shutil.which("ffprobe"), "FFmpeg/FFprobe required")
+    def test_timeline_http_review_render_caption_preview_and_export(self):
+        timeline, source, key = self.timeline_fixture()
+        preview = self.api("GET", "/api/timeline-assets/"+source["key"])
+        self.assertEqual(preview["kind"], "image")
+        status, headers, raw = self.request("GET", preview["preview"])
+        self.assertEqual(status, 200)
+        self.assertEqual(headers["Content-Type"], "image/png")
+        self.assertTrue(raw.startswith(b"\x89PNG\r\n\x1a\n"))
+        self.assertEqual(self.api("GET", "/api/timelines?profile=default")[0]["id"], "edit")
+        self.assertEqual(self.api("GET", "/api/timelines?profile=other"), [])
+        self.assertEqual(self.request("POST", "/api/timelines/edit/render", {"version": 1}, {"Idempotency-Key": "too-early"})[0], 409)
+        self.assertEqual(self.request("GET", "/api/timeline-media/edit/1/film.mp4")[0], 409)
+        review = {"version": 1, "shot": "opening", "decision": "approve", "note": "Original framing and rights reviewed."}
+        self.api("POST", "/api/timelines/edit/shot", review)
+        self.assertEqual(len(self.api("POST", "/api/timelines/edit/shot", review)["reviews"]), 1)
+        self.api("POST", "/api/timelines/edit/seal", {"version": 1})
+        self.api("POST", "/api/timelines/edit/seal", {"version": 1})
+        render_key = uuid.uuid4().hex
+        action = self.api("POST", "/api/timelines/edit/render", {"version": 1}, {"Idempotency-Key": render_key})
+        repeated = self.api("POST", "/api/timelines/edit/render", {"version": 1}, {"Idempotency-Key": render_key})
+        self.assertEqual(repeated["id"], action["id"])
+        for _ in range(100):
+            result = self.api("GET", "/api/timelines/edit?version=1")
+            if result["actions"][0]["status"] not in {"queued", "running"}:
+                break
+            time.sleep(0.02)
+        self.assertEqual(result["state"], "needs_review")
+        self.assertEqual(result["actions"][0]["status"], "done")
+        status, headers, raw = self.request("GET", "/api/timeline-media/edit/1/film.mp4", headers={"Range": "bytes=0-31"})
+        self.assertEqual(status, 206)
+        self.assertEqual(len(raw), 32)
+        self.assertIn(b"ftyp", raw)
+        status, headers, raw = self.request("GET", "/api/timeline-media/edit/1/captions.vtt")
+        self.assertEqual(status, 200)
+        self.assertEqual(headers["Content-Type"], "text/vtt; charset=utf-8")
+        self.assertIn(b"00:00:00.000 --> 00:00:00.500", raw)
+        self.assertIn(b"cue, with a comma", raw)
+        self.assertEqual(self.request("GET", "/api/timeline-export/edit/1")[0], 409)
+        self.api("POST", "/api/timelines/edit/approve", {"version": 1})
+        self.api("POST", "/api/timelines/edit/approve", {"version": 1})
+        status, headers, raw = self.request("GET", "/api/timeline-export/edit/1")
+        self.assertEqual(status, 200)
+        with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+            self.assertEqual(set(archive.namelist()), {"film.mp4", "timeline.json", "captions.srt"})
+            self.assertNotIn(source["ref"]["run"], archive.read("timeline.json").decode())
+        with self.store.connect() as db:
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM web_timeline_actions").fetchone()[0], 1)
+        film = self.server.app.timeline.directory("edit", 1)/"film.mp4"
+        film.write_bytes(b"Changed render")
+        for path in ["/api/timeline-media/edit/1/film.mp4", "/api/timeline-media/edit/1/captions.vtt", "/api/timeline-export/edit/1"]:
+            self.assertEqual(self.request("GET", path)[0], 409)
+
+    @unittest.skipUnless(shutil.which("ffmpeg") and shutil.which("ffprobe"), "FFmpeg/FFprobe required")
+    def test_timeline_mutations_are_persistently_idempotent_and_preserve_history(self):
+        timeline, source, key = self.timeline_fixture()
+        spec = timeline["spec"]
+        repeated = self.api("POST", "/api/timelines", {"id": "edit", "spec": spec, "profile": "default"}, {"Idempotency-Key": key})
+        self.assertEqual(repeated["version"], 1)
+        spec = json.loads(json.dumps(spec)); spec["title"] = "Revised original edit"
+        revision_key = uuid.uuid4().hex
+        body = {"version": 1, "spec": spec}
+        self.assertEqual(self.api("POST", "/api/timelines/edit/revise", body, {"Idempotency-Key": revision_key})["version"], 2)
+        self.assertEqual(self.api("POST", "/api/timelines/edit/revise", body, {"Idempotency-Key": revision_key})["version"], 2)
+        self.assertEqual(self.request("POST", "/api/timelines/edit/revise", body, {"Idempotency-Key": uuid.uuid4().hex})[0], 409)
+        self.assertEqual(self.api("GET", "/api/timelines/edit?version=1")["spec"]["title"], "Original HTTP edit")
+        spec["title"] = "Different request with same key"
+        self.assertEqual(self.request("POST", "/api/timelines/edit/revise", body, {"Idempotency-Key": revision_key})[0], 409)
+        with self.store.connect() as db:
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM timeline_versions").fetchone()[0], 2)
+        self.assertEqual(self.request("POST", "/api/timelines", {"id": "missing-key", "spec": spec})[0], 409)
+
+    @unittest.skipUnless(shutil.which("ffmpeg") and shutil.which("ffprobe"), "FFmpeg/FFprobe required")
+    def test_timeline_sources_are_scoped_verified_and_new_routes_require_auth(self):
+        timeline, source, _ = self.timeline_fixture()
+        other_engine = Engine(self.store, load_cards(None))
+        other = other_engine.create(Brief("Other preference fixture", "cover", profile="other", local_only=True))
+        other_engine.execute(other); other_engine.approve(other)
+        self.assertTrue(all(a["ref"]["run"] != other for a in self.api("GET", "/api/timeline-assets")["assets"]))
+        self.assertEqual(len(self.api("GET", "/api/timeline-assets?profile=other")["assets"]), 1)
+        for path in ["/api/timelines", "/api/timeline-assets", "/api/timeline-previews/"+source["key"], "/api/timeline-media/edit/1/film.mp4", "/api/timeline-export/edit/1"]:
+            self.assertEqual(self.request("GET", path, auth=False)[0], 401)
+            self.assertEqual(self.request("GET", path, headers={"Origin": "https://example.com"})[0], 403)
+        run = self.store.run(source["ref"]["run"])
+        self.server.app.engine.artifact(run["id"], run["steps"][0]["result"]).write_bytes(b"changed source")
+        self.assertEqual(self.api("GET", "/api/timeline-assets")["unavailable_runs"], 1)
+        self.assertEqual(self.request("GET", "/api/timeline-assets/"+source["key"])[0], 409)
+        self.assertEqual(self.request("GET", "/api/timeline-previews/"+source["key"])[0], 409)
+        self.assertEqual(self.request("POST", "/api/timelines/edit/shot", {"version": 1, "shot": "opening", "decision": "approve", "note": "Changed source must block review."})[0], 409)
+
+    def test_timeline_legacy_profile_migration_and_non_replayed_actions(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            with sqlite3.connect(Path(temporary)/"loom.sqlite3") as db:
+                db.execute("CREATE TABLE timelines(id TEXT PRIMARY KEY,current_version INTEGER NOT NULL,created TEXT DEFAULT CURRENT_TIMESTAMP)")
+                db.execute("INSERT INTO timelines(id,current_version) VALUES('legacy',1)")
+            migrated = Store(Path(temporary))
+            with migrated.connect() as db:
+                self.assertEqual(db.execute("SELECT profile FROM timelines WHERE id='legacy'").fetchone()[0], "default")
+        with self.store.connect() as db:
+            db.execute("INSERT INTO web_timeline_actions VALUES('interrupted-edit','missing',1,'queued',NULL)")
+        from creator_loom.workbench import Workbench
+        with patch("creator_loom.timeline.Timeline.render", side_effect=AssertionError("No replay")):
+            fresh = Workbench(self.store, load_cards(None))
+            fresh.pool.shutdown(wait=True)
+        with self.store.connect() as db:
+            self.assertEqual(db.execute("SELECT status FROM web_timeline_actions WHERE id='interrupted-edit'").fetchone()[0], "interrupted")
+
+    @unittest.skipUnless(shutil.which("ffmpeg") and shutil.which("ffprobe"), "FFmpeg/FFprobe required")
+    def test_queued_timeline_render_cannot_target_a_new_revision(self):
+        timeline, source, _ = self.timeline_fixture()
+        self.api("POST", "/api/timelines/edit/shot", {"version": 1, "shot": "opening", "decision": "approve", "note": "Source and timing reviewed."})
+        self.api("POST", "/api/timelines/edit/seal", {"version": 1})
+        key = uuid.uuid4().hex
+        with patch.object(self.server.app.pool, "submit") as submit:
+            self.api("POST", "/api/timelines/edit/render", {"version": 1}, {"Idempotency-Key": key})
+            self.assertEqual(submit.call_count, 1)
+        spec = timeline["spec"]; spec["title"] = "A newer explicit edit"
+        self.api("POST", "/api/timelines/edit/revise", {"version": 1, "spec": spec}, {"Idempotency-Key": uuid.uuid4().hex})
+        with patch("creator_loom.timeline_media.render", side_effect=AssertionError("No stale rendering")):
+            self.server.app._render_timeline(key, "edit", 1)
+        self.assertEqual(self.api("GET", "/api/timelines/edit")["state"], "draft")
+        old = self.api("GET", "/api/timelines/edit?version=1")
+        self.assertEqual(old["state"], "sealed")
+        self.assertEqual(old["actions"][0]["status"], "error")
+        with self.store.connect() as db:
+            self.assertIsNone(db.execute("SELECT outputs FROM timeline_versions WHERE timeline_id='edit' AND version=2").fetchone()[0])

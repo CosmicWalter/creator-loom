@@ -27,6 +27,20 @@ The learning radar shows subscribed sources, literal keyword evidence and preser
 
 Completed works offer medium-specific review questions. The browser revision editor currently supports text steps; it records an actually changed draft, dimension, before/after self-ratings and a rationale. Other media retain review questions and ordinary feedback. Progress is self-reported, not proof of independently measured skill gains.
 
+## Editing room
+
+Open **剪辑台** to select already approved images/video/WAV audio. Source choices are organized by the current preference profile and cover its most recent 300 approved runs; a missing or changed source is omitted and counted. Profiles organize preferences and content, not separate users or authorization. Existing CLI timelines migrate to `default`; new CLI timelines can specify `--profile`.
+
+Create an edit with a title, canvas and frame rate. Add shots, move them earlier/later, set duration and source-video in points, and choose still-image center zoom where appropriate. The editor aligns duration to frame boundaries. Preview is of the actual source image/clip: PPM is converted to PNG locally, not replaced with a differently typeset SVG. Final crop and motion must be checked on the rendered film.
+
+Select narration/music from approved audio, set in points and gains, and optionally loop music from the beginning. Add ordered plain-text captions with explicit times. These are manual timings, not automatic transcription or word alignment. Original video audio is not retained unless it is an explicitly selected supported audio track.
+
+Saving creates a frozen edit version. Inspect each shot and record approval/rejection with a reason; decisions cannot be overwritten with a different review. Once all shots are approved, seal and start local rendering. Work proceeds in the background with a persisted action key; refreshing does not resubmit it. Version-bound actions cannot silently render a newer edit, and server restart marks unfinished web actions interrupted rather than replaying them.
+
+Inspect the actual film, use the subtitle menu for derived WebVTT captions where supported, then approve the final film before downloading its MP4/SRT/edit-manifest ZIP. Every preview, review and delivery retains source/output integrity checks. Historical versions can still be viewed and approved historical deliveries downloaded; editing from a historical version saves a new version against the current revision.
+
+Unsaved edit fields remain in page memory when navigating within the workbench, with a resume entry in the editing room. They are not persisted across closing/reloading the page; save first. The editor requests a normal browser unload prompt when dirty, but browsers may handle that prompt differently. Failed saves retain the draft and its stable request key for retry. Browser interaction/visual acceptance is still pending.
+
 ## Deliverable bundles
 
 An approved run can download a ZIP containing explicitly allowed creative files plus a manifest of their hashes. Raw plans, endpoints, profiles, source books, practice data, idempotency keys, remote IDs and provider usage/operational sidecars are not included. Timing JSON is rebuilt from start/end/text only. Archive entry timestamps are fixed and do not preserve the host's clock or filesystem metadata.
@@ -43,6 +57,6 @@ Drafts, actions and run data persist in the selected data directory, which is ig
 
 ## Verification status
 
-Real HTTP tests cover authentication, Host/Origin boundaries, frozen/idempotent creation, background cover execution, verified previews/ranges, approval/export, source import/series setup, text revision practice, session renewal and non-replayed interrupted actions. JavaScript syntax and packaged frontend assets are checked separately.
+Real HTTP tests cover authentication, Host/Origin boundaries, frozen/idempotent creation, background cover execution, verified previews/ranges, approval/export, source import/series setup, text revision practice, session renewal and non-replayed interrupted actions. Additional real HTTP/FFmpeg checks cover the editing room, source preview, duplicate saves/renders, legacy profile migration, stale queued revisions, WebVTT/SRT delivery, authentication and tamper rejection. JavaScript syntax and packaged frontend assets are checked separately.
 
 Browser interaction and visual acceptance have not yet been recorded. HTTP tests and source inspection do not establish responsive layout quality or prove that every browser interaction works. Continue that acceptance before presenting the workbench as production ready.

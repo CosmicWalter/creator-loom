@@ -189,6 +189,8 @@ def main(argv=None):
         p.add_argument("--spec", type=Path, required=True)
         if command == "timeline-revise":
             p.add_argument("--base-version", type=int, required=True)
+        else:
+            p.add_argument("--profile", default="default")
     for command in ["timeline-inspect", "timeline-export"]:
         p = sub.add_parser(command)
         p.add_argument("id")
@@ -215,7 +217,7 @@ def main(argv=None):
             timeline = Timeline(store)
             action = args.command.removeprefix("timeline-")
             if action == "new":
-                emit(timeline.create(args.id, json.loads(args.spec.read_text())))
+                emit(timeline.create(args.id, json.loads(args.spec.read_text()), args.profile))
             elif action == "revise":
                 emit(timeline.revise(args.id, json.loads(args.spec.read_text()), args.base_version))
             elif action == "shot":
@@ -311,7 +313,7 @@ def main(argv=None):
             identifier(args.profile)
             store.forget(args.profile)
             emit({"status": "preferences_routing_feedback_and_measurements_deleted",
-                  "retained": "workbench plans/actions, remote operation receipts, research subscriptions/evidence, books, series continuity, creative runs, artifacts (including embedded metrics), practice, evaluations and audit events"})
+                  "retained": "timeline versions/shot reviews/renders, workbench plans/actions, remote operation receipts, research subscriptions/evidence, books, series continuity, creative runs, artifacts (including embedded metrics), practice, evaluations and audit events"})
         elif args.command == "models":
             emit([m.to_dict() for m in cards])
         elif args.command == "discover":

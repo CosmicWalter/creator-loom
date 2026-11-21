@@ -29,6 +29,25 @@ from .locking import run_lock
 from .research import Research
 from .series import Series
 from .mediaflow import MediaFlow
+from .timeline import Timeline
+from . import timeline_media
+
+
+TIMELINE_ERRORS = {
+    "Timeline changed; inspect the current version before editing or reviewing": "剪辑已有新版本。草稿仍保留，请查看当前版本后再决定如何保存。",
+    "Caption cues must be ordered, non-overlapping and at least one millisecond": "请按时间顺序填写字幕，避免重叠，并让每条至少持续一毫秒。",
+    "Caption text must be 1–500 plain characters without markup or control characters": "字幕需为 1–500 个纯文本字符，不能包含换行、尖括号或控制字符。",
+    "Shot exceeds its source video duration": "镜头的入点加时长超出了源视频，请缩短时长或提前入点。",
+    "Audio in point is outside its source": "音频入点已超出源音频，请提前入点。",
+    "Only music from in=0 can loop": "只有从 0 秒开始的音乐音轨可以循环。",
+    "Zoom motion currently requires a still image": "居中推近仅支持静态图片，视频片段请使用保持原画面。",
+    "Approve every shot before sealing the edit": "请先让每个镜头审核通过；已否决的镜头需另存新版本修改。",
+    "Shot decision is immutable; revise the edit": "已保存的镜头审核不可覆盖，请基于此版编辑并保存新版本。",
+    "Timeline sources must be approved creative artifacts": "剪辑只能引用已审核通过的源作品，请先到作品档案检查。",
+    "Local media tool unavailable or timed out; no remote operation was submitted": "本机媒体工具不可用或超时，请确认已安装 FFmpeg / FFprobe；没有提交远端任务。",
+    "Timeline exceeds ten minutes": "剪辑总时长不能超过十分钟，请拆分为多份作品。",
+    "Only draft shots can be reviewed": "这个版本已不能修改镜头审核，请检查版本或另存新版本。",
+}
 
 
 class Workbench:
@@ -39,8 +58,10 @@ class Workbench:
         self.series = Series(store, self.engine)
         self.coach = Coach(store, self.engine)
         self.research = Research(store, Learning(store, self.engine))
+        self.timeline = Timeline(store)
         self.pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix="loom-workbench")
         with store.connect() as db:
+            db.execute("UPDATE web_timeline_actions SET status='interrupted',error='服务重启；请检查剪辑状态，未自动重新渲染。' WHERE status IN ('queued','running')")
             db.execute("UPDATE web_actions SET status='interrupted',error='服务重启；未自动重做。' WHERE status IN ('queued','running')")
 
     def plan(self, body):
@@ -96,8 +117,108 @@ class Workbench:
         with self.store.connect() as db:
             db.execute("UPDATE web_actions SET status=?,error=? WHERE id=?", (state, error, key))
 
+    def timeline_assets(self, profile):
+        with self.store.connect() as db:
+            rows = []
+            for row in db.execute("SELECT id,brief FROM runs WHERE status='approved' ORDER BY rowid DESC"):
+                if json.loads(row["brief"])["profile"] == profile:
+                    rows.append(row)
+                    if len(rows) == 300:
+                        break
+        assets, checked, unavailable = [], 0, 0
+        for row in rows:
+            brief = json.loads(row["brief"])
+            if brief["profile"] != profile:
+                continue
+            if checked == 300:
+                break
+            checked += 1
+            run = self.store.run(row["id"])
+            try:
+                self.engine.verify_artifacts(run)
+            except (OSError, ValueError):
+                unavailable += 1
+                continue
+            for step in run["steps"]:
+                for index, result in enumerate([step["result"], *step["result"]["supplements"]]):
+                    suffix = Path(result["file"]).suffix
+                    if suffix not in {".png", ".ppm", ".mp4", ".wav"}:
+                        continue
+                    slot = "main" if index == 0 else "s"+str(index-1)
+                    key = run["id"]+"/"+step["id"]+"/"+slot
+                    assets.append({"key": key, "title": brief["topic"], "stage": step["id"],
+                                   "kind": "audio" if suffix == ".wav" else "video" if suffix == ".mp4" else "image",
+                                   "ref": {"run": run["id"], "step": step["id"], "file": result["file"], "sha256": result["sha256"]}})
+        return {"assets": assets, "unavailable_runs": unavailable, "scope": "Most recent 300 approved runs in this preference profile"}
+
+    def timeline_source(self, key):
+        run_id, step_id, slot = key.split("/")
+        run = self.store.run(run_id)
+        step = next((s for s in run["steps"] if s["id"] == step_id), None)
+        if not step or not step["result"]:
+            raise ValueError("Unknown source artifact")
+        result = step["result"] if slot == "main" else step["result"]["supplements"][int(slot[1:])]
+        ref = {"run": run_id, "step": step_id, "file": result["file"], "sha256": result["sha256"]}
+        suffix = Path(result["file"]).suffix
+        ref, path, info = self.timeline.reference(ref, "audio" if suffix == ".wav" else "visual")
+        kind = "audio" if suffix == ".wav" else "video" if suffix == ".mp4" else "image"
+        value = {"ref": ref, "kind": kind, "duration": None if kind == "image" else timeline_media.duration(info, "audio" if kind == "audio" else "video"),
+                 "preview": ("/api/timeline-previews/" if suffix == ".ppm" else "/api/artifacts/")+key}
+        return value, path
+
+    def timeline_detail(self, name, version=None):
+        result = self.timeline.inspect(name, version)
+        with self.store.connect() as db:
+            result["actions"] = [dict(r) for r in db.execute("SELECT * FROM web_timeline_actions WHERE timeline_id=? AND version=? ORDER BY rowid DESC LIMIT 10", (name, result["version"]))]
+        return result
+
+    def timeline_action(self, name, version, key):
+        identifier(key)
+        if type(version) is not int:
+            raise ValueError("Timeline version must be an integer")
+        with self.store.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            prior = db.execute("SELECT * FROM web_timeline_actions WHERE id=?", (key,)).fetchone()
+            if prior:
+                if prior["timeline_id"] != name or prior["version"] != version:
+                    raise ValueError("Render key was used for another timeline/version")
+                return dict(prior)
+            timeline = self.timeline.inspect(name)
+            self.timeline.require_current(timeline, version)
+            if timeline["state"] not in {"sealed", "needs_review", "approved"}:
+                raise ValueError("Seal the reviewed timeline before rendering")
+            db.execute("INSERT INTO web_timeline_actions VALUES(?,?,?,'queued',NULL)", (key, name, version))
+        self.pool.submit(self._render_timeline, key, name, version)
+        return {"id": key, "status": "queued", "timeline_id": name, "version": version}
+
+    def _render_timeline(self, key, name, version):
+        with self.store.connect() as db:
+            db.execute("UPDATE web_timeline_actions SET status='running' WHERE id=?", (key,))
+        try:
+            self.timeline.render(name, version)
+            status, error = "done", None
+        except Exception:
+            status, error = "error", "剪辑未完成。请检查镜头版本、审核与素材状态；旧版产物已保留。"
+        with self.store.connect() as db:
+            db.execute("UPDATE web_timeline_actions SET status=?,error=? WHERE id=?", (status, error, key))
+
     def get(self, path, query):
         profile = identifier(query.get("profile", ["default"])[0])
+        if path == "/api/timeline-assets":
+            return self.timeline_assets(profile)
+        match = re.fullmatch(r"/api/timeline-assets/([A-Za-z0-9_-]+/[A-Za-z0-9_-]+/(?:main|s\d+))", path)
+        if match:
+            return self.timeline_source(match[1])[0]
+        if path == "/api/timelines":
+            with self.store.connect() as db:
+                rows = db.execute("""SELECT t.id,t.current_version,v.state,v.spec FROM timelines t
+                  JOIN timeline_versions v ON v.timeline_id=t.id AND v.version=t.current_version
+                  WHERE t.profile=? ORDER BY t.rowid DESC LIMIT 300""", (profile,)).fetchall()
+            return [{"id": r["id"], "version": r["current_version"], "state": r["state"],
+                     "title": json.loads(r["spec"])["title"], "duration": json.loads(r["spec"])["duration"]} for r in rows]
+        match = re.fullmatch(r"/api/timelines/([A-Za-z0-9_-]+)", path)
+        if match:
+            return self.timeline_detail(match[1], int(query["version"][0]) if "version" in query else None)
         if path == "/api/overview":
             with self.store.connect() as db:
                 runs = []
@@ -149,6 +270,21 @@ class Workbench:
         raise ValueError("Unknown endpoint")
 
     def post(self, path, body, key):
+        if path == "/api/timelines":
+            identifier(key)
+            return self.timeline.create(body["id"], body["spec"], body.get("profile", "default"), request_key=key)
+        match = re.fullmatch(r"/api/timelines/([A-Za-z0-9_-]+)/(revise|shot|seal|render|approve)", path)
+        if match:
+            name, operation = match.groups()
+            version = body["version"]
+            if operation == "revise":
+                identifier(key)
+                return self.timeline.revise(name, body["spec"], version, request_key=key)
+            if operation == "shot":
+                return self.timeline.review_shot(name, body["shot"], version, body["decision"], body["note"])
+            if operation == "render":
+                return self.timeline_action(name, version, key)
+            return getattr(self.timeline, operation)(name, version)
         if path == "/api/plans":
             return self.plan(body)
         if path == "/api/runs":
@@ -281,10 +417,10 @@ class Handler(BaseHTTPRequestHandler):
             if self.headers.get("Host") != urlsplit(self.server.origin).netloc:
                 return self.respond(403, {"error": "只允许本机工作台访问。"})
             parsed = urlsplit(self.path)
-            if parsed.path in {"/", "/app.js", "/app.css"}:
-                name = {"/": "index.html", "/app.js": "app.js", "/app.css": "app.css"}[parsed.path]
+            if parsed.path in {"/", "/app.js", "/app.css", "/timeline.js"}:
+                name = {"/": "index.html", "/app.js": "app.js", "/app.css": "app.css", "/timeline.js": "timeline.js"}[parsed.path]
                 raw = (Path(__file__).parent/"static"/name).read_bytes()
-                mime = {"index.html": "text/html", "app.js": "text/javascript", "app.css": "text/css"}[name]
+                mime = {"index.html": "text/html", "app.js": "text/javascript", "app.css": "text/css", "timeline.js": "text/javascript"}[name]
                 self.headers_for(200, mime+"; charset=utf-8", len(raw))
                 return self.wfile.write(raw)
             if not self.trusted():
@@ -295,6 +431,38 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond(200, {"authenticated": True})
             if re.fullmatch(r"/api/artifacts/[A-Za-z0-9_-]+/[A-Za-z0-9_-]+/(?:main|s\d+)", parsed.path):
                 return self.artifact(parsed.path)
+            match = re.fullmatch(r"/api/timeline-media/([A-Za-z0-9_-]+)/(\d+)/(film\.mp4|captions\.srt|captions\.vtt|timeline\.json)", parsed.path)
+            if match:
+                name, version, filename = match.groups()
+                timeline = self.server.app.timeline.inspect(name, int(version))
+                if timeline["state"] not in {"needs_review", "approved"}:
+                    raise ValueError("Timeline render is not ready")
+                self.server.app.timeline.verify_outputs(timeline)
+                if filename == "captions.vtt":
+                    if not timeline["spec"]["captions"]:
+                        raise ValueError("Timeline has no captions")
+                    raw = timeline_media.vtt(timeline["spec"]["captions"]).encode()
+                    self.headers_for(200, "text/vtt; charset=utf-8", len(raw))
+                    return self.wfile.write(raw)
+                if filename not in {o["file"] for o in timeline["outputs"]}:
+                    raise ValueError("Unknown output")
+                return self.stream_file(self.server.app.timeline.directory(name, int(version))/filename)
+            match = re.fullmatch(r"/api/timeline-export/([A-Za-z0-9_-]+)/(\d+)", parsed.path)
+            if match:
+                raw = self.server.app.timeline.bundle(match[1], int(match[2]))
+                self.headers_for(200, "application/zip", len(raw), {"Content-Disposition": 'attachment; filename="creator-loom-timeline.zip"'})
+                return self.wfile.write(raw)
+            match = re.fullmatch(r"/api/timeline-previews/([A-Za-z0-9_-]+/[A-Za-z0-9_-]+/(?:main|s\d+))", parsed.path)
+            if match:
+                value, source = self.server.app.timeline_source(match[1])
+                if source.suffix != ".ppm":
+                    raise ValueError("Only PPM needs a derived image preview")
+                raw = timeline_media.command(["ffmpeg", "-nostdin", "-v", "error", "-protocol_whitelist", "file,pipe",
+                     "-format_whitelist", "ppm_pipe", "-i", str(source), "-frames:v", "1", "-vf", "scale=640:360:force_original_aspect_ratio=decrease,setsar=1",
+                     "-map_metadata", "-1", "-f", "image2pipe", "-c:v", "png", "-threads", "1", "pipe:1"], timeout=20)
+                self.server.app.timeline.reference(value["ref"], "visual")
+                self.headers_for(200, "image/png", len(raw))
+                return self.wfile.write(raw)
             if re.fullmatch(r"/api/export/[A-Za-z0-9_-]+", parsed.path):
                 raw = delivery(self.server.app.engine, parsed.path.rsplit("/", 1)[-1])
                 self.headers_for(200, "application/zip", len(raw), {"Content-Disposition": 'attachment; filename="creator-loom-delivery.zip"'})
@@ -313,6 +481,9 @@ class Handler(BaseHTTPRequestHandler):
             raise ValueError("No artifact for this step")
         result = step["result"] if slot == "main" else step["result"]["supplements"][int(slot[1:])]
         target = self.server.app.engine.artifact(run_id, result)
+        return self.stream_file(target)
+
+    def stream_file(self, target):
         size = target.stat().st_size
         start, end, status = 0, size-1, 200
         if self.headers.get("Range"):
@@ -332,7 +503,7 @@ class Handler(BaseHTTPRequestHandler):
         headers["Content-Security-Policy"] = "default-src 'none'; style-src 'unsafe-inline'; img-src data:; sandbox"
         if status == 206:
             headers["Content-Range"] = f"bytes {start}-{end}/{size}"
-        mime = "text/plain; charset=utf-8" if target.suffix in {".md", ".json", ".txt"} else mimetypes.guess_type(target.name)[0] or "application/octet-stream"
+        mime = "text/plain; charset=utf-8" if target.suffix in {".md", ".json", ".txt", ".srt"} else mimetypes.guess_type(target.name)[0] or "application/octet-stream"
         self.headers_for(status, mime, end-start+1, headers)
         with target.open("rb") as file:
             file.seek(start)
@@ -371,4 +542,6 @@ class Handler(BaseHTTPRequestHandler):
                 message = "没有符合当前要求的模型。请检查已启用的模型配置、本地选项、输入长度和预算。"
             elif isinstance(exc, ValueError) and str(exc).startswith("No complete workflow"):
                 message = "现有模型组合无法同时满足预算、延迟与输入长度，请调整要求后重新预览。"
+            if isinstance(exc, ValueError) and str(exc) in TIMELINE_ERRORS:
+                message = TIMELINE_ERRORS[str(exc)]
             return self.respond(409, {"error": message})

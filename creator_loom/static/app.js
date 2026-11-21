@@ -204,15 +204,18 @@ async function navigate(view) {
       create: "创作台",
       runs: "作品档案",
       books: "我的书架",
+      timelines: "剪辑台",
       research: "学习雷达",
       growth: "成长记录",
     }[view] || "作品详情");
+  $("#content").classList.toggle("timeline-content", view === "timelines");
   $("#content").replaceChildren();
   if (view === "create") createView();
   if (view === "runs") runsView();
   if (view === "books") booksView();
   if (view === "research") await researchView();
   if (view === "growth") growthView();
+  if (view === "timelines") await timelineView();
 }
 function workCard(run) {
   const card = node("button", "work-card");
@@ -512,6 +515,7 @@ async function openRun(id) {
   state.run = id;
   const run = await api("/api/runs/" + id);
   const root = $("#content");
+  root.classList.remove("timeline-content");
   root.replaceChildren();
   $("#breadcrumb").textContent = "工作空间 / 作品详情";
   const titleBlock = node("div", "detail-title"),
@@ -1166,9 +1170,13 @@ $(".brand").onclick = (e) => {
 $("#refresh").onclick = () =>
   state.view === "detail"
     ? openRun(state.run).catch((e) => toast(e.message))
-    : navigate(state.view).catch((e) => toast(e.message));
+    : state.view === "timeline-detail"
+      ? (timelineUI.loaded ? openTimeline(timelineUI.loaded.id, timelineUI.loaded.version) : navigate("timelines")).catch(e => toast(e.message))
+      : state.view === "timeline-edit"
+        ? renderTimelineEditor()
+        : navigate(state.view).catch((e) => toast(e.message));
 $("#profile").onchange = () =>
-  navigate(state.view === "detail" ? "runs" : state.view).catch((e) =>
+  navigate(state.view === "detail" ? "runs" : state.view.startsWith("timeline") ? "timelines" : state.view).catch((e) =>
     toast(e.message),
   );
 document

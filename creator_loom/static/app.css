@@ -1000,3 +1000,27 @@ meter {
     gap: 10px;
   }
 }
+/* Timeline controls use the same paper, spacing and review language as the workbench. */
+.timeline-editor { display: grid; gap: 24px; font-size: 16px; }
+.timeline-editor label { font-size: 14px; }
+.timeline-editor input, .timeline-editor select { font-size: 16px; min-height: 44px; }
+.timeline-editor input[type="checkbox"] { width: 22px; min-height: 22px; display: block; }
+.timeline-shot { border-top: 1px solid var(--line); padding: 24px 0; }
+.timeline-shot-head { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 18px; }
+.timeline-shot-head h3 { margin: 0; white-space: nowrap; }
+.timeline-preview { max-width: 720px; margin: 15px 0 22px; background: #f0f3f0; border-radius: 10px; padding: 12px; }
+.timeline-preview img, .timeline-preview video { display: block; width: 100%; max-height: 340px; object-fit: contain; border-radius: 6px; background: #182720; }
+.timeline-preview audio { width: 100%; }
+.timeline-preview .mini-note { font-size: 14px; margin: 10px 0 0; }
+.audio-preview { background: transparent; padding: 0; }
+.timeline-audio + .timeline-audio { border-top: 1px solid var(--line); margin-top: 22px; padding-top: 22px; }
+.timeline-caption { display: grid; grid-template-columns: 100px 100px minmax(160px, 1fr) auto; align-items: center; gap: 14px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.timeline-caption label { margin-bottom: 10px; }
+.timeline-strip { display: flex; gap: 10px; overflow: auto; margin: 10px 0; padding: 5px 0; list-style: none; }
+.timeline-strip li { flex: 0 0 auto; background: var(--mint); color: var(--green); padding: 13px 18px; border-radius: 6px; font-size: 14px; }
+.timeline-film { width: 100%; max-height: 600px; background: #182720; border-radius: 10px; }
+.caption-summary { padding: 10px 0; border-top: 1px solid var(--line); font-size: 16px; white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 900px) { .timeline-caption { grid-template-columns: 1fr 1fr; } .timeline-caption label:nth-child(3) { grid-column: 1 / -1; } .timeline-shot-head { align-items: flex-start; flex-direction: column; } }
+@media (max-width: 640px) { .timeline-editor .panel { padding: 18px; } .timeline-shot-head .toolbar { gap: 8px; flex-wrap: wrap; } .timeline-shot-head button { padding: 9px 12px; font-size: 14px; } }
+.timeline-content { font-size: 16px; }
+.timeline-content label, .timeline-content .mini-note, .timeline-content .subtle, .timeline-content .chip, .timeline-content button { font-size: 14px; }
