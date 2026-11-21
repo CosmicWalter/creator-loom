@@ -19,6 +19,7 @@ from .routing import load_cards
 from .store import Store
 from .library import Library
 from .series import Series
+from .story_memory import StoryMemory
 from .research import Research
 from .lab import Lab
 from .mediaflow import Client as MediaFlowClient, MediaFlow
@@ -255,6 +256,17 @@ def main(argv=None):
             p.add_argument("--b", type=float, required=True)
             p.add_argument("--reviewer-kind", choices=["self", "external-declared"], required=True)
             p.add_argument("--rationale", required=True)
+    for command in ["series-memory", "series-memory-update"]:
+        p = sub.add_parser(command)
+        p.add_argument("series")
+        if command == "series-memory":
+            p.add_argument("--version", type=int)
+        else:
+            p.add_argument("--spec", type=Path, required=True)
+            p.add_argument("--base-version", type=int, required=True)
+            p.add_argument("--memory-version", type=int, required=True)
+            p.add_argument("--reviewed", action="store_true")
+            p.add_argument("--note", required=True)
     args = parser.parse_args(argv)
     try:
         store = Store(args.data)
@@ -265,7 +277,11 @@ def main(argv=None):
         library = Library(store)
         series = Series(store, engine)
         research = Research(store, learning)
-        if args.command == "practice-blind":
+        if args.command == "series-memory":
+            emit(StoryMemory(store).inspect(args.series, args.version))
+        elif args.command == "series-memory-update":
+            emit(StoryMemory(store).update(args.series, json.loads(args.spec.read_text()), args.base_version, args.memory_version, args.note, args.reviewed))
+        elif args.command == "practice-blind":
             emit(coach.new_review(args.id))
         elif args.command.startswith("practice-review-"):
             action = args.command.removeprefix("practice-review-")
@@ -414,7 +430,7 @@ def main(argv=None):
             identifier(args.profile)
             store.forget(args.profile)
             emit({"status": "preferences_routing_feedback_and_measurements_deleted",
-                  "retained": "research syntheses/experiments/evidence, media assets/music projects/rights/reviews, timeline versions/shot reviews/renders, workbench plans/actions, remote operation receipts, research subscriptions/evidence, books, series continuity, creative runs, artifacts (including embedded metrics), practice, evaluations and audit events"})
+                  "retained": "character-memory versions/citations/reviews, research syntheses/experiments/evidence, media assets/music projects/rights/reviews, timeline versions/shot reviews/renders, workbench plans/actions, remote operation receipts, research subscriptions/evidence, books, series continuity, creative runs, artifacts (including embedded metrics), practice, evaluations and audit events"})
         elif args.command == "models":
             emit([m.to_dict() for m in cards])
         elif args.command == "discover":

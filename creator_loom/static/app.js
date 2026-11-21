@@ -647,6 +647,14 @@ async function openRun(id) {
     main.append(p);
   }
   const summary = panel("这次创作的决定");
+  if (run.plan.context?.character_memory) {
+    const memory = run.plan.context.character_memory;
+    summary.append(node("p", "mini-note", `角色记忆版本 ${memory.version} · ${memory.payload.characters.length} 个角色 · 保存于本计划，不随未来更新改变`));
+    for (const character of memory.payload.characters) {
+      summary.append(node("strong", "", character.name));
+      for (const fact of character.facts) summary.append(node("p", "mini-note", fact.text));
+    }
+  }
   add(
     summary,
     add(
@@ -892,6 +900,7 @@ function booksView() {
       }),
     );
     if (series.completed) p.querySelector("button")?.remove();
+    p.append(button("角色记忆与版本", () => storyMemoryDialog(series.id)));
     root.append(p);
   }
   if (!state.overview.series.length)

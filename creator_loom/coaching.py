@@ -162,6 +162,9 @@ class Coach:
         if run["plan"].get("context"):
             binding["brief"]["source_text"] = run["plan"]["context"]["source"]["text"]
             binding["brief"]["continuity"] = run["plan"]["context"]["continuity"]
+            if run["plan"]["context"].get("character_memory"):
+                from .story_memory import StoryMemory
+                binding["brief"]["character_facts"] = StoryMemory.prompt_data(run["plan"]["context"]["character_memory"])
         with self.store.connect() as db:
             db.execute("BEGIN IMMEDIATE")
             prior = db.execute("SELECT id FROM practice_reviews WHERE practice_id=?", (practice_id,)).fetchone()
@@ -195,6 +198,10 @@ class Coach:
         context = run["plan"].get("context")
         if context and (binding["brief"].get("source_text") != context["source"]["text"] or binding["brief"].get("continuity") != context["continuity"]):
             raise ValueError("Practice source context changed")
+        if context and context.get("character_memory"):
+            from .story_memory import StoryMemory
+            if binding["brief"].get("character_facts") != StoryMemory.prompt_data(context["character_memory"]):
+                raise ValueError("Practice character context changed")
         if binding["revised"] != practice["artifact"] or binding["original"]["sha256"] != practice["artifact"]["original_sha256"]:
             raise ValueError("Practice review artifact binding changed")
         for result in [binding["original"], binding["revised"], *binding["shared_inputs"]]:

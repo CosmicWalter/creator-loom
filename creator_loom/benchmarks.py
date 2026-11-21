@@ -172,6 +172,9 @@ class Benchmarks:
         if context:
             result["brief"]["source_text"] = context["source"]["text"]
             result["brief"]["continuity"] = context["continuity"]
+            if context.get("character_memory"):
+                from .story_memory import StoryMemory
+                result["brief"]["character_facts"] = StoryMemory.prompt_data(context["character_memory"])
         target = baseline["plan"]["steps"][-1]
         for step in baseline["steps"][:-1]:
             if step["id"] not in target["dependencies"]:

@@ -57,3 +57,7 @@ An uncertain or externally waiting operation requires `--provider-checked` in ad
 ## Evidence scope
 
 Tests use original text/EPUB fixtures and simulated model responses. They cover text preservation, spine order, import bounds, provenance, concurrent reservation/acceptance, stale edits, source/artifact tampering and explicit handling of uncertain outcomes. A real HTTP test runs two imported units through narration and actual FFmpeg videos with a simulated inference server. It proves integration and sequential review mechanics, not literary fidelity, human-level narration or customer quality acceptance.
+
+## Reviewed character memory
+
+Series can now retain bounded, categorized character facts with exact original/accepted-episode citations, review notes and immutable history. Future episodes freeze the current memory; editing/restoring memory creates a new revision and increments the series version without advancing the source cursor. Pending episodes lock memory updates. See [character memory](story-memory.md) for workbench, CLI and limits. Plain continuity notes remain separate and are never silently converted into facts.

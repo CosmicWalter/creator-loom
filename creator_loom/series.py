@@ -8,6 +8,7 @@ from dataclasses import asdict
 
 from .domain import Brief, identifier
 from .library import Library
+from .story_memory import StoryMemory
 
 
 class Series:
@@ -63,6 +64,7 @@ class Series:
         if snapshot["completed"]:
             raise ValueError("Series has consumed all imported units")
         context = self.library.context(snapshot["definition"]["book_id"], snapshot["cursor"], snapshot["continuity"])
+        context["character_memory"] = StoryMemory(self.store).snapshot(series_id, snapshot["memory_version"])
         context["series"] = {"id": series_id, "version": snapshot["version"], "position": snapshot["cursor"]}
         brief = Brief(**snapshot["definition"]["brief"])
         plan = self.engine.plan(brief, technique, context)

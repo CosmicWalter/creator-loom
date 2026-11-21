@@ -59,6 +59,10 @@ class Store:
                   id TEXT PRIMARY KEY, definition TEXT NOT NULL, cursor INTEGER NOT NULL DEFAULT 0,
                   version INTEGER NOT NULL DEFAULT 1, continuity TEXT NOT NULL DEFAULT '',
                   pending_run TEXT, created TEXT DEFAULT CURRENT_TIMESTAMP);
+                CREATE TABLE IF NOT EXISTS story_memories (
+                  series_id TEXT NOT NULL, version INTEGER NOT NULL, payload TEXT NOT NULL,
+                  sha256 TEXT NOT NULL, review_note TEXT NOT NULL, created TEXT DEFAULT CURRENT_TIMESTAMP,
+                  PRIMARY KEY(series_id,version));
                 CREATE TABLE IF NOT EXISTS series_episodes (
                   run_id TEXT PRIMARY KEY, series_id TEXT NOT NULL, position INTEGER NOT NULL,
                   state TEXT NOT NULL, continuity TEXT, reason TEXT,
@@ -137,6 +141,8 @@ class Store:
                   PRIMARY KEY(benchmark_id,id));
             ''')
             db.execute("BEGIN IMMEDIATE")
+            if "memory_version" not in {r[1] for r in db.execute("PRAGMA table_info(series)")}:
+                db.execute("ALTER TABLE series ADD COLUMN memory_version INTEGER NOT NULL DEFAULT 0")
             if "profile" not in {r[1] for r in db.execute("PRAGMA table_info(timelines)")}:
                 db.execute("ALTER TABLE timelines ADD COLUMN profile TEXT NOT NULL DEFAULT 'default'")
             if "transport" not in {r[1] for r in db.execute("PRAGMA table_info(subscriptions)")}:

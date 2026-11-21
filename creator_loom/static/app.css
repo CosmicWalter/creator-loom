@@ -1039,3 +1039,5 @@ meter {
 .lab-review { margin: 22px 0; font-size: 16px; }
 .lab-review label, .lab-review button { font-size: 14px; }
 @media (max-width: 800px) { .lab-pair { grid-template-columns: 1fr; } }
+.memory-fact { border-top: 1px solid var(--line); margin-top: 20px; padding-top: 20px; }
+.memory-source { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 260px; overflow: auto; padding: 16px; background: #eef3ed; font-size: 16px; line-height: 1.8; }

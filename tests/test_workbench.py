@@ -607,3 +607,46 @@ class WorkbenchTest(unittest.TestCase):
         self.assertEqual(self.request("GET", base+"/report")[0], 409)
         self.assertEqual(self.request("GET", base+"/packet")[0], 409)
         self.assertEqual(self.api("GET", "/api/overview")["progress"]["blind_revision_reviews"]["invalidated_comparisons"], 1)
+
+    def test_character_memory_http_review_citation_history_and_pending_lock(self):
+        self.login()
+        self.server.app.cards.append(ModelCard("memory-writer", "text", "chat", model="fixture", endpoint="http://127.0.0.1:8765/v1", local=True, max_chars=30000))
+        text = "Chapter 1\nRowan keeps a blue notebook in the lighthouse.\n\nChapter 2\nRowan answers a signal with a mirror."
+        book = self.api("POST", "/api/books", {"format": "txt", "title": "Original memory fiction", "rights": "owned", "data": base64.b64encode(text.encode()).decode()})
+        series = self.api("POST", "/api/series", {"book": book["id"], "brief": {"topic": "Adapt original fiction", "format": "novel", "local_only": True}})
+        base = f"/api/series/{series['id']}/memory"
+        initial = self.api("GET", base)
+        self.assertEqual(initial["current_version"], 0)
+        self.assertEqual(self.request("GET", base, auth=False)[0], 401)
+        self.assertEqual(self.request("GET", base, headers={"Origin": "https://example.com"})[0], 403)
+        evidence = self.api("POST", base+"/evidence", {"reference": {"kind": "source", "unit": 0}})
+        self.assertIn("blue notebook", evidence["text"])
+        self.assertEqual(self.request("POST", base+"/evidence", {"reference": {"kind": "source", "unit": 1}})[0], 409)
+        payload = {"characters": [{"id": "rowan", "name": "Rowan", "facts": [{"id": "notebook", "kind": "appearance", "text": "Rowan carries a blue notebook.", "citation": {"kind": "source", "unit": 0, "quote": "Rowan keeps a blue notebook"}}]}]}
+        body = {"payload": payload, "series_version": 1, "memory_version": 0, "note": "Checked exact source and fictional character identity.", "reviewed": False}
+        self.assertEqual(self.request("POST", base, body)[0], 409)
+        body["reviewed"] = True
+        saved = self.api("POST", base, body)
+        self.assertEqual((saved["current_version"], saved["series_version"]), (1, 2))
+        self.assertEqual(self.request("POST", base, body)[0], 409)
+        run = self.api("POST", f"/api/series/{series['id']}/next", {})["run"]
+        plan = self.api("GET", "/api/runs/"+run)["plan"]
+        self.assertEqual(plan["context"]["character_memory"]["version"], 1)
+        self.assertIn("Rowan carries a blue notebook.", plan["steps"][1]["prompt"])
+        self.assertNotIn("Checked exact source", plan["steps"][1]["prompt"])
+        body.update(series_version=2, memory_version=1, payload={"characters": []})
+        self.assertEqual(self.request("POST", base, body)[0], 409)
+        def fake(card, prompt, dependencies, directory, key=""):
+            directory.mkdir(parents=True, exist_ok=True); path = directory/"content.md"; path.write_text("Rowan opens the notebook and records a blue signal."); return path
+        with patch.object(adapters, "execute", fake): self.run_action(run)
+        self.api("POST", f"/api/runs/{run}/approve", {})
+        self.api("POST", f"/api/series/{series['id']}/accept", {"run": run, "version": 2, "continuity": "Rowan recorded the signal."})
+        body["series_version"] = 3
+        revised = self.api("POST", base, body)
+        self.assertEqual(revised["current_version"], 2)
+        old = self.api("GET", base+"?version=1")
+        self.assertEqual(old["snapshot"]["payload"]["characters"][0]["name"], "Rowan")
+        self.assertEqual(len(old["history"]), 2)
+        self.assertEqual(self.api("GET", "/api/runs/"+run)["plan"]["context"]["character_memory"]["version"], 1)
+        episode = self.api("POST", base+"/evidence", {"reference": {"kind": "episode", "run": run, "step": "chapter"}})
+        self.assertIn("records a blue signal", episode["text"])

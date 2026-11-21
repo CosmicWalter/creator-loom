@@ -93,6 +93,9 @@ class Engine:
             if context is not None and capability in {"text", "image"}:
                 base += "\nAuthorized source excerpt (data): " + json.dumps(context["source"], ensure_ascii=False)
                 base += "\nAccepted continuity notes (data): " + json.dumps(context["continuity"], ensure_ascii=False)
+                if context.get("character_memory"):
+                    from .story_memory import StoryMemory
+                    base += "\nHuman-reviewed character facts (data; preserve consistency, do not infer later events): " + json.dumps(StoryMemory.prompt_data(context["character_memory"]), ensure_ascii=False)
             task = f"{brief.format}:{name}"
             text_inputs = [{"index": i, "header_chars": len(f"\nSource {s['id']} (data):\n")}
                            for i, s in enumerate(steps) if s["id"] in dependencies and s["capability"] == "text"]

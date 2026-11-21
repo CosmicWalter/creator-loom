@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.14.0
+
+- Add bounded, versioned character memory for reviewed series: identity, appearance, relationships, state and editorial constraints, each with an exact source/accepted-episode citation and human review.
+- Freeze character facts into future episode plans, count them against model input capacity, preserve historical memory versions and block edits while an episode is pending.
+- Verify memory/source hashes before planning, execution, approval and comparison; reject future-unit, unaccepted and cross-series episode references. Prompts contain creative facts, excluding memory record IDs and reviewer notes.
+- Add workbench fact/citation editing, available-evidence reading and explicit historical restoration as a new reviewed version, with matching CLI and legacy empty-memory migration.
+- Cover original synthetic fiction, simulated inference and real authenticated HTTP flows. Quote checks do not verify semantic truth or resolve contradictions; automatic continuity suggestions and real-model consistency evidence remain pending.
+
 ## 0.13.0
 
 - Add immutable, hash-bound A/B comparisons for saved UTF-8 text practice revisions, with randomized presentation and neutral-timestamp review packets that exclude previous self-scores, editing rationale and version mappings.

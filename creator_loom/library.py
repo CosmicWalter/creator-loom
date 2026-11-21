@@ -283,4 +283,12 @@ class Library:
         expected = self.context(source["book_id"], source["index"], context.get("continuity", ""))
         if expected["source"] != source:
             raise ValueError("Source snapshot no longer matches the imported book")
+        if "character_memory" in context:
+            from .story_memory import StoryMemory
+            if not isinstance(context.get("series"), dict) or context["character_memory"].get("series") != context["series"].get("id"):
+                raise ValueError("Character memory must belong to the planned series")
+            memory = StoryMemory(self.store)
+            if memory.series(context["series"]["id"])["definition"]["book_id"] != source["book_id"]:
+                raise ValueError("Character memory and source book belong to different series")
+            memory.validate(context["character_memory"])
         return expected

@@ -29,6 +29,7 @@ from .locking import run_lock
 from .research import Research
 from .lab import Lab, creative_tasks
 from .series import Series
+from .story_memory import StoryMemory
 from .mediaflow import MediaFlow
 from .timeline import Timeline
 from . import timeline_media
@@ -37,6 +38,13 @@ from .music import Music
 
 
 TIMELINE_ERRORS = {
+    "Series/memory changed or an episode is pending; finish it before editing memory": "系列或角色记忆已有变化，或仍有待完成章节。请查看当前版本，并先完成或拒绝待定章节。",
+    "Series changed during character-memory review": "系列在审核期间已更新。草稿未写入，请检查当前版本后再决定。",
+    "Fact quotation is not present in the bound evidence": "事实引用与所选原文不一致，请从证据原文逐字复制并检查。",
+    "Fact evidence cannot cite an unvisited future source unit": "角色事实不能引用尚未进入创作进度的后续原文。",
+    "A character needs 1–20 reviewed facts": "每个角色需保留 1–20 条已核对事实，或移除暂不使用的角色。",
+    "Memory revision must change the reviewed character facts": "角色事实尚未改变，无需创建重复版本。",
+
     "Timeline changed; inspect the current version before editing or reviewing": "剪辑已有新版本。草稿仍保留，请查看当前版本后再决定如何保存。",
     "Caption cues must be ordered, non-overlapping and at least one millisecond": "请按时间顺序填写字幕，避免重叠，并让每条至少持续一毫秒。",
     "Caption text must be 1–500 plain characters without markup or control characters": "字幕需为 1–500 个纯文本字符，不能包含换行、尖括号或控制字符。",
@@ -299,6 +307,11 @@ class Workbench:
         if path.startswith("/api/books/"):
             book_id = path.rsplit("/", 1)[-1]
             return self.library.context(book_id, int(query["unit"][0])) if "unit" in query else self.library.inspect(book_id)
+        match = re.fullmatch(r"/api/series/([A-Za-z0-9_-]+)/memory", path)
+        if match:
+            result = StoryMemory(self.store).inspect(match[1], int(query["version"][0]) if "version" in query else None)
+            result["evidence_options"] = StoryMemory(self.store).evidence_options(match[1])
+            return result
         if path.startswith("/api/series/"):
             return self.series.inspect(path.rsplit("/", 1)[-1])
         if path == "/api/research":
@@ -399,6 +412,12 @@ class Workbench:
                 return self.library.import_book(source, body["title"], body["rights"], body.get("rights_note", ""))
         if path == "/api/series":
             return self.series.create(body["book"], Brief(**body["brief"]), body.get("continuity", ""), body.get("start_unit", 0))
+        match = re.fullmatch(r"/api/series/([A-Za-z0-9_-]+)/memory(?:/(evidence))?", path)
+        if match:
+            memory = StoryMemory(self.store)
+            if match[2]:
+                return {"text": memory.evidence_text(match[1], body["reference"])}
+            return memory.update(match[1], body["payload"], body["series_version"], body["memory_version"], body["note"], body.get("reviewed"))
         if path.startswith("/api/series/"):
             _, _, _, series_id, operation = path.split("/")
             if operation == "next":
@@ -515,10 +534,10 @@ class Handler(BaseHTTPRequestHandler):
             if self.headers.get("Host") != urlsplit(self.server.origin).netloc:
                 return self.respond(403, {"error": "只允许本机工作台访问。"})
             parsed = urlsplit(self.path)
-            if parsed.path in {"/", "/app.js", "/app.css", "/timeline.js", "/media.js", "/lab.js", "/practice.js"}:
-                name = {"/": "index.html", "/app.js": "app.js", "/app.css": "app.css", "/timeline.js": "timeline.js", "/media.js": "media.js", "/lab.js": "lab.js", "/practice.js": "practice.js"}[parsed.path]
+            if parsed.path in {"/", "/app.js", "/app.css", "/timeline.js", "/media.js", "/lab.js", "/practice.js", "/memory.js"}:
+                name = {"/": "index.html", "/app.js": "app.js", "/app.css": "app.css", "/timeline.js": "timeline.js", "/media.js": "media.js", "/lab.js": "lab.js", "/practice.js": "practice.js", "/memory.js": "memory.js"}[parsed.path]
                 raw = (Path(__file__).parent/"static"/name).read_bytes()
-                mime = {"index.html": "text/html", "app.js": "text/javascript", "app.css": "text/css", "timeline.js": "text/javascript", "media.js": "text/javascript", "lab.js": "text/javascript", "practice.js": "text/javascript"}[name]
+                mime = {"index.html": "text/html", "app.js": "text/javascript", "app.css": "text/css", "timeline.js": "text/javascript", "media.js": "text/javascript", "lab.js": "text/javascript", "practice.js": "text/javascript", "memory.js": "text/javascript"}[name]
                 self.headers_for(200, mime+"; charset=utf-8", len(raw))
                 return self.wfile.write(raw)
             if not self.trusted():
