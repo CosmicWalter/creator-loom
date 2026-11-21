@@ -10,7 +10,7 @@ Local workflow documentation was inspected before creating this repository. No s
 | Cover / AIGC | Character references, reference consistency, short sample gates, stop-motion composition | SVG/PPM cover, image endpoint contract | Reference-conditioned image adapters, shot reviews, stop-motion timeline |
 | Cutbot | Media assembly, account-separated queues and publication safety | Reviewed multi-shot FFmpeg cuts, image zoom, explicit subtitles and two-track mixing | Automatic shot selection, workbench editing and explicit publishing |
 | NovelForge | Chapter rewrite, translation, human review, platform draft boundaries | Imported chapter → adaptation outline → prose, with reviewed continuity notes | Rich character memory, revision editor and publishing drafts |
-| Suno adaptation | Music reinterpretation and human review boundaries | No music-generation or adaptation adapter yet | Rights-aware briefs, explicit handoff and verified authorized audio import |
+| Suno adaptation | User-requested music adaptation direction; local implementation not yet inspected in this update | No music-generation or adaptation adapter yet | Rights-aware briefs, explicit handoff and verified authorized audio import |
 | MediaFlow | Immutable workflow snapshots, artifact hashes, submit-once inference | Narration adapter, frozen segment jobs, resumable polling, explicit reconciliation | Transcription delivery and richer workflow adapters |
 | OmniPublish | One upload, existing authenticated accounts, per-platform receipt | No publishing integration yet | Isolated connector; final approval and remote receipt required |
 

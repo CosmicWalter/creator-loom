@@ -52,6 +52,6 @@ This is a delivery backlog, not a promise that the complete product is already a
 
 ## Public experience and music workflows
 
-- [ ] Publish a responsive project website to this repository's GitHub Pages with accurate capability boundaries and usable onboarding.
+- [x] Publish the project website to this repository's `gh-pages` branch; deployment and public asset hashes verified. Responsive styles exist; browser/mobile acceptance remains pending.
 - [ ] Friendly workbench timeline editing and verified browser/mobile interaction flows.
 - [ ] Rights-aware Suno adaptation workflow, explicit human handoff and verified receipt/import boundaries.
