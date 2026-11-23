@@ -21,7 +21,7 @@ class Learning:
         if not isinstance(guidance, str) or not 1 <= len(guidance.strip()) <= 2000:
             raise ValueError("Guidance must contain 1–2000 characters")
         if task_scope is not None:
-            valid = {f"{fmt}:{step}" for fmt, recipe in RECIPES.items() for step, _, _ in recipe if fmt != "research"}
+            valid = {f"{fmt}:{step}" for fmt, recipe in RECIPES.items() for step, _, _ in recipe if fmt not in {"research", "continuity"}}
             if not isinstance(task_scope, list) or not task_scope or len(set(task_scope)) != len(task_scope) or any(t not in valid for t in task_scope):
                 raise ValueError("Technique scope must name supported creative tasks")
         active = db.execute("SELECT id,payload FROM techniques WHERE state='active'").fetchone()
@@ -98,7 +98,7 @@ class Learning:
                     candidate["plan"]["technique_snapshot"] != proposal):
                 raise ValueError("Evaluation does not match the proposal's frozen baseline")
             def context(plan):
-                return {"preferences": plan["preferences"], "source_context": plan.get("context"), "input_assets": plan.get("input_assets", []), "public_credits": plan.get("public_credits", []), "research_context": plan.get("research_context"),
+                return {"preferences": plan["preferences"], "source_context": plan.get("context"), "input_assets": plan.get("input_assets", []), "public_credits": plan.get("public_credits", []), "research_context": plan.get("research_context"), "story_context": plan.get("story_context"),
                         "steps": [{k: step[k] for k in ["id", "capability", "dependencies", "model"]}
                                   for step in plan["steps"]]}
             if context(baseline["plan"]) != context(candidate["plan"]):

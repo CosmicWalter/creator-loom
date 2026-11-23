@@ -61,3 +61,7 @@ Tests use original text/EPUB fixtures and simulated model responses. They cover 
 ## Reviewed character memory
 
 Series can now retain bounded, categorized character facts with exact original/accepted-episode citations, review notes and immutable history. Future episodes freeze the current memory; editing/restoring memory creates a new revision and increments the series version without advancing the source cursor. Pending episodes lock memory updates. See [character memory](story-memory.md) for workbench, CLI and limits. Plain continuity notes remain separate and are never silently converted into facts.
+
+## Suggested continuity updates
+
+After an episode is accepted, the [continuity proposal](continuity.md) flow can reserve a text-model plan over its actual output and the current frozen facts. It never changes notes or facts automatically. Approve the proposal artifact, inspect literal quotes and any proposed replacement, then select supported changes with a human review. Current series/memory versions must still match; stale suggestions cannot overwrite newer continuity.

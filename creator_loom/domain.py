@@ -151,6 +151,7 @@ class Brief:
 
 # Dependencies refer to immutable outputs, not hidden global project state.
 RECIPES = {
+    "continuity": [("facts", "text", [])],
     "research": [("synthesis", "text", [])],
     "song": [("lyrics", "text", []), ("direction", "text", ["lyrics"])],
     "article": [("draft", "text", [])],

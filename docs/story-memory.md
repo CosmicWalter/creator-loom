@@ -1,6 +1,6 @@
 # Reviewed character memory
 
-Sequential book adaptation needs stable story facts, not just another unconstrained summary. Series now support bounded character records with exact source citations and explicit human review. The feature preserves reviewed memory versions in episode plans. It does not infer character facts automatically, detect semantic contradictions, track a complete fictional timeline or guarantee model consistency.
+Sequential book adaptation needs stable story facts, not just another unconstrained summary. Series now support bounded character records with exact source citations and explicit human review. The feature preserves reviewed memory versions in episode plans. It does not adopt facts automatically, validate semantic contradictions, track a complete fictional timeline or guarantee model consistency. The [continuity proposal](continuity.md) flow can ask a configured model to suggest quoted candidate changes, which remain inactive until explicitly selected and reviewed.
 
 ## Workbench
 
@@ -71,4 +71,4 @@ Comparison packets include the creative character facts needed to judge consiste
 
 Original fictional text and simulated model outputs exercise source/episode citations, no-future-unit restrictions, cross-series rejection, legacy migration, CLI review, pending locks, version history, frozen prompts and hash-change blocking. Real authenticated HTTP tests cover evidence viewing, review gates, stale updates and chapter acceptance followed by another memory version. They verify the workflow, not actual model faithfulness or narrative quality.
 
-Automatic fact proposals, semantic conflict detection, temporal fact lifetimes, retrieval over large casts, real-model continuity comparisons and browser/mobile usability remain separate work.
+Model-assisted fact proposals are now available through a separate explicit review flow; validated semantic conflict detection, temporal fact lifetimes, retrieval over large casts, real-model continuity comparisons and browser/mobile usability remain separate work.

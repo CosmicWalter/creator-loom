@@ -120,13 +120,18 @@ class StoryMemory:
             raise ValueError("Memory revision must change the reviewed character facts")
         with self.store.connect() as db:
             db.execute("BEGIN IMMEDIATE")
-            changed = db.execute("UPDATE series SET memory_version=memory_version+1,version=version+1 WHERE id=? AND version=? AND memory_version=? AND pending_run IS NULL", (name, series_version, memory_version))
-            if changed.rowcount != 1:
-                raise ValueError("Series changed during character-memory review")
-            # No content is published or inferred: each revision is a reviewed local snapshot.
-            db.execute("INSERT INTO story_memories(series_id,version,payload,sha256,review_note) VALUES(?,?,?,?,?)", (name, memory_version+1, json.dumps(normalized, ensure_ascii=False), checksum, review_note))
-            self.store.event(db, "character_memory_reviewed", name, {"memory_version": memory_version+1, "series_version": series_version+1, "sha256": checksum})
+            self.update_in(db, name, normalized, series_version, memory_version, review_note)
         return self.inspect(name)
+
+    def update_in(self, db, name, normalized, series_version, memory_version, review_note):
+        """Commit reviewed facts with another local review decision atomically."""
+        checksum = digest(normalized)
+        changed = db.execute("UPDATE series SET memory_version=memory_version+1,version=version+1 WHERE id=? AND version=? AND memory_version=? AND pending_run IS NULL", (name, series_version, memory_version))
+        if changed.rowcount != 1:
+            raise ValueError("Series changed during character-memory review")
+        # No content is published or inferred: each revision is a reviewed local snapshot.
+        db.execute("INSERT INTO story_memories(series_id,version,payload,sha256,review_note) VALUES(?,?,?,?,?)", (name, memory_version+1, json.dumps(normalized, ensure_ascii=False), checksum, review_note))
+        self.store.event(db, "character_memory_reviewed", name, {"memory_version": memory_version+1, "series_version": series_version+1, "sha256": checksum})
 
     def validate(self, snapshot):
         if not isinstance(snapshot, dict) or set(snapshot) != {"series", "version", "sha256", "payload"}:

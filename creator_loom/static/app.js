@@ -12,6 +12,7 @@ const formats = {
   article: "文章",
   song: "歌词与音乐方案",
   research: "资料综合提案",
+  continuity: "连续性候选事实",
   novel: "小说改编",
   cover: "本地图形封面",
   podcast: "播客口播",
@@ -32,6 +33,7 @@ const stages = {
   draft: "文章",
   lyrics: "歌词方案",
   synthesis: "证据综合",
+  facts: "角色事实建议",
   direction: "音乐方向",
   imported: "授权导入",
   outline: "故事大纲",
@@ -280,7 +282,7 @@ function createView() {
   topic.placeholder =
     "例如：一张关于海边阅读时光的封面，安静、简洁，有一点探索的感觉。";
   topic.maxLength = 10000;
-  const format = select(Object.entries(formats).filter(([id]) => id !== "research"), "cover"),
+  const format = select(Object.entries(formats).filter(([id]) => !["research", "continuity"].includes(id)), "cover"),
     language = select([
       ["zh", "中文"],
       ["en", "English"],
@@ -900,7 +902,7 @@ function booksView() {
       }),
     );
     if (series.completed) p.querySelector("button")?.remove();
-    p.append(button("角色记忆与版本", () => storyMemoryDialog(series.id)));
+    p.append(button("角色记忆与版本", () => storyMemoryDialog(series.id)), button("模型辅助连续性建议", () => continuityDialog(series.id)));
     root.append(p);
   }
   if (!state.overview.series.length)

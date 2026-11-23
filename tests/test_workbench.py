@@ -650,3 +650,42 @@ class WorkbenchTest(unittest.TestCase):
         self.assertEqual(self.api("GET", "/api/runs/"+run)["plan"]["context"]["character_memory"]["version"], 1)
         episode = self.api("POST", base+"/evidence", {"reference": {"kind": "episode", "run": run, "step": "chapter"}})
         self.assertIn("records a blue signal", episode["text"])
+
+
+    def test_continuity_suggestion_http_explicit_execution_and_selected_memory_update(self):
+        self.login()
+        self.server.app.cards.append(ModelCard("continuity-writer", "text", "chat", model="fixture", local=True, endpoint="http://127.0.0.1:8765/v1", max_chars=40000))
+        book = self.api("POST", "/api/books", {"format": "txt", "title": "Original continuity fixture", "rights": "owned", "data": base64.b64encode(b"Chapter 1\nRowan opens the shutter.\n\nChapter 2\nA distant signal arrives.").decode()})
+        series = self.api("POST", "/api/series", {"book": book["id"], "brief": {"topic": "Adapt original fiction", "format": "novel", "local_only": True}})
+        create = {"id": "continuity-http", "series": series["id"], "settings": {"budget": 1, "local_only": True, "max_latency": 300}}
+        self.assertEqual(self.request("POST", "/api/continuity", create, {"Idempotency-Key": "not-yet"})[0], 409)
+        episode = self.api("POST", f"/api/series/{series['id']}/next", {})["run"]
+        value = {"status": "suggestions", "summary": "An original accepted character action can become a reviewed state fact.", "changes": [{"character": None, "name": "Rowan", "fact": None, "kind": "state", "text": "Rowan has opened the green shutter.", "quote": "Rowan opens a green shutter", "reason": "The accepted text says this happened; persistence still needs human review."}], "warnings": ["No semantic or temporal truth guarantee."]}
+        calls = []
+        def fake(card, prompt, dependencies, directory, key=""):
+            calls.append(prompt); directory.mkdir(parents=True, exist_ok=True); path = directory/"content.md"
+            path.write_text(json.dumps(value) if "Format: continuity;" in prompt else "Rowan opens a green shutter to answer a signal.")
+            return path
+        with patch.object(adapters, "execute", fake): self.run_action(episode)
+        self.api("POST", f"/api/runs/{episode}/approve", {})
+        self.api("POST", f"/api/series/{series['id']}/accept", {"run": episode, "version": 1, "continuity": "The green shutter opened."})
+        key = uuid.uuid4().hex
+        proposal = self.api("POST", "/api/continuity", create, {"Idempotency-Key": key})
+        self.assertEqual(self.api("POST", "/api/continuity", create, {"Idempotency-Key": key})["run_id"], proposal["run_id"])
+        self.assertEqual(len(calls), 2)
+        base = "/api/continuity/"+proposal["id"]
+        self.assertEqual(self.request("GET", base, auth=False)[0], 401)
+        self.assertEqual(self.request("GET", base, headers={"Origin": "https://example.com"})[0], 403)
+        self.assertEqual(self.request("GET", base+"/draft")[0], 409)
+        with patch.object(adapters, "execute", fake): self.run_action(proposal["run_id"])
+        self.assertEqual(self.api("GET", base+"/draft")["changes"][0]["name"], "Rowan")
+        decision = {"selected": [0], "note": "Read the original quote and reviewed the character state and scope.", "reviewed": True}
+        self.assertEqual(self.request("POST", base+"/accept", decision)[0], 409)
+        self.api("POST", f"/api/runs/{proposal['run_id']}/approve", {})
+        accepted = self.api("POST", base+"/accept", decision)
+        self.assertEqual(accepted["result_version"], 1)
+        self.assertEqual(self.api("POST", base+"/accept", decision)["result_version"], 1)
+        current = self.api("GET", f"/api/series/{series['id']}/memory")
+        self.assertEqual(current["snapshot"]["payload"]["characters"][0]["facts"][0]["text"], value["changes"][0]["text"])
+        self.assertEqual(len(self.api("GET", f"/api/series/{series['id']}/continuity")), 1)
+        self.assertEqual(len(calls), 3)

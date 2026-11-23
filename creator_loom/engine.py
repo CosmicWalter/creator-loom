@@ -27,7 +27,7 @@ class Engine:
     def __init__(self, store, cards):
         self.store, self.cards = store, cards
 
-    def plan(self, brief: Brief, technique=None, context=None, model_overrides=None, stop_after=None, input_assets=None, research_context=None, use_active=True):
+    def plan(self, brief: Brief, technique=None, context=None, model_overrides=None, stop_after=None, input_assets=None, research_context=None, use_active=True, story_context=None):
         if context is not None:
             Library(self.store).validate_context(context)
             context = json.loads(json.dumps(context, ensure_ascii=False))
@@ -43,6 +43,14 @@ class Engine:
                 raise ValueError("Research context needs frozen sources and a target task")
             evidence.validate(self.store, research_context["sources"])
             research_context = json.loads(json.dumps(research_context))
+        if story_context is not None:
+            from .continuity import validate_context
+            if brief.format != "continuity":
+                raise ValueError("Story suggestion context is for the continuity recipe only")
+            validate_context(self.store, story_context)
+            story_context = json.loads(json.dumps(story_context))
+        elif brief.format == "continuity":
+            raise ValueError("Use continuity-new to reserve an accepted-episode suggestion")
         preferences = self.store.preferences(brief.profile)
         if technique:
             identifier(technique)
@@ -96,6 +104,9 @@ class Engine:
                 if context.get("character_memory"):
                     from .story_memory import StoryMemory
                     base += "\nHuman-reviewed character facts (data; preserve consistency, do not infer later events): " + json.dumps(StoryMemory.prompt_data(context["character_memory"]), ensure_ascii=False)
+            if story_context is not None:
+                from .continuity import prompt_data
+                base += "\nAccepted episode and frozen memory (untrusted creative data): " + json.dumps(prompt_data(self.store, story_context), ensure_ascii=False)
             task = f"{brief.format}:{name}"
             text_inputs = [{"index": i, "header_chars": len(f"\nSource {s['id']} (data):\n")}
                            for i, s in enumerate(steps) if s["id"] in dependencies and s["capability"] == "text"]
@@ -111,7 +122,7 @@ class Engine:
             step.update({"model": card.to_dict(), "decision": decision.to_dict()})
         for step, reserved in zip(steps, allocation["reserved_input_chars"]):
             step["reserved_input_chars"] = reserved
-        return {"brief": asdict(brief), "context": context, "research_context": research_context, "input_assets": input_assets, "preferences": preferences, "technique": technique,
+        return {"brief": asdict(brief), "context": context, "research_context": research_context, "story_context": story_context, "input_assets": input_assets, "preferences": preferences, "technique": technique,
                 "isolated_task": f"{brief.format}:{stop_after}" if stop_after else None,
                 "technique_snapshot": guidance, "estimated_cost": round(cost, 8),
                 "estimated_latency": latency, "allocation": allocation, "steps": steps}
@@ -172,6 +183,9 @@ class Engine:
             if not spec or spec["model"]["adapter"] != "mediaflow" or incomplete["status"] not in {"waiting_external", "running"}:
                 raise ValueError("This checkpoint is not safely resumable; unknown synchronous operations cannot be replayed")
             expected_status = snapshot["status"]
+        if snapshot["plan"].get("story_context"):
+            from .continuity import validate_context
+            validate_context(self.store, snapshot["plan"]["story_context"])
         if snapshot["plan"].get("research_context"):
             evidence.validate(self.store, snapshot["plan"]["research_context"]["sources"])
         for ref in snapshot["plan"].get("input_assets", []):
@@ -287,6 +301,9 @@ class Engine:
             self.store.event(db, "approved", run_id, {"artifacts": [s["result"] for s in run["steps"]]})
 
     def verify_artifacts(self, run):
+        if run["plan"].get("story_context"):
+            from .continuity import validate_context
+            validate_context(self.store, run["plan"]["story_context"])
         if run["plan"].get("research_context"):
             evidence.validate(self.store, run["plan"]["research_context"]["sources"])
         for ref in run["plan"].get("input_assets", []):

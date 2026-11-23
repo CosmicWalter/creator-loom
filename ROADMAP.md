@@ -29,7 +29,8 @@ This is a delivery backlog, not a promise that the complete product is already a
 - [x] Versioned CLI edit lists, per-shot review, sealed rendering and final approval over hash-bound sources.
 - [x] Workbench shot-list timeline editing, source/media previews, sound/caption controls, version review and background render/delivery (HTTP/media execution verified).
 - [x] Bounded human-reviewed character facts with exact source/accepted-episode citations, version history, frozen chapter inputs and workbench/CLI editing.
-- [ ] Automatic continuity proposals, semantic contradiction/timeline reasoning, richer memory retrieval and direct-manipulation multi-track editing.
+- [x] Explicit model-assisted proposals from accepted episode text, exact quotes and frozen memory; selected changes need human review and atomic versioned acceptance (simulated inference/HTTP verified).
+- [ ] Validated semantic contradiction/timeline reasoning, richer memory retrieval and direct-manipulation multi-track editing.
 - [x] Authenticated loopback workbench, frozen plan confirmation, artifact preview/review and structured deliverable export.
 - [x] Workbench book import, sequential creation, research inbox and text revision practice backed by existing APIs.
 - [x] Rights-aware local image/audio/video imports, immutable review, source normalization, reusable timeline references and attribution-preserving bundles.

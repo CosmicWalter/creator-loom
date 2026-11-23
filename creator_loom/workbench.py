@@ -30,6 +30,7 @@ from .research import Research
 from .lab import Lab, creative_tasks
 from .series import Series
 from .story_memory import StoryMemory
+from .continuity import Continuity
 from .mediaflow import MediaFlow
 from .timeline import Timeline
 from . import timeline_media
@@ -38,6 +39,11 @@ from .music import Music
 
 
 TIMELINE_ERRORS = {
+    "Accept at least one actual episode before asking for continuity suggestions": "请先制作、审核并接受本系列至少一章，再请求连续性建议。",
+    "Finish or reject the pending episode before planning continuity suggestions": "已有待完成章节，请先完成接受或明确拒绝，再规划连续性建议。",
+    "Series or memory changed; generate a new suggestion instead of overwriting newer facts": "系列或记忆已有变化，这份建议仅供留存查看；请基于当前版本重新规划。",
+    "Selected candidates do not change the reviewed memory": "选中建议与已审核事实相同，不会创建重复记忆版本。",
+
     "Series/memory changed or an episode is pending; finish it before editing memory": "系列或角色记忆已有变化，或仍有待完成章节。请查看当前版本，并先完成或拒绝待定章节。",
     "Series changed during character-memory review": "系列在审核期间已更新。草稿未写入，请检查当前版本后再决定。",
     "Fact quotation is not present in the bound evidence": "事实引用与所选原文不一致，请从证据原文逐字复制并检查。",
@@ -67,6 +73,7 @@ class Workbench:
         self.engine = Engine(store, cards)
         self.library = Library(store)
         self.series = Series(store, self.engine)
+        self.continuity = Continuity(store, cards)
         self.coach = Coach(store, self.engine)
         self.research = Research(store, Learning(store, self.engine))
         self.lab = Lab(store, cards)
@@ -304,6 +311,12 @@ class Workbench:
             return [{"step": r["step_id"], "segments": [{"index": i, "status": s["status"],
                      "job_id": s["job_id"], "text": s["request"]["text"]}
                      for i, s in enumerate(json.loads(r["payload"])["segments"])]} for r in rows]
+        match = re.fullmatch(r"/api/continuity/([A-Za-z0-9_-]+)(/draft)?", path)
+        if match:
+            return self.continuity.draft(match[1]) if match[2] else self.continuity.inspect(match[1])
+        match = re.fullmatch(r"/api/series/([A-Za-z0-9_-]+)/continuity", path)
+        if match:
+            return self.continuity.list(match[1])
         if path.startswith("/api/books/"):
             book_id = path.rsplit("/", 1)[-1]
             return self.library.context(book_id, int(query["unit"][0])) if "unit" in query else self.library.inspect(book_id)
@@ -322,6 +335,12 @@ class Workbench:
         raise ValueError("Unknown endpoint")
 
     def post(self, path, body, key):
+        if path == "/api/continuity":
+            identifier(key)
+            return self.continuity.create(body["id"], body["series"], body["settings"], key)
+        match = re.fullmatch(r"/api/continuity/([A-Za-z0-9_-]+)/accept", path)
+        if match:
+            return self.continuity.accept(match[1], body["selected"], body["note"], body.get("reviewed"))
         match = re.fullmatch(r"/api/practice/([A-Za-z0-9_-]+)/blind", path)
         if match:
             return self.coach.new_review(match[1])

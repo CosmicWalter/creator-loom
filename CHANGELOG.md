@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.15.0
+
+- Add model-assisted continuity proposals over the latest accepted text episode and a frozen character-memory snapshot, with explicit plan/execute/approve boundaries and stable reservation keys.
+- Parse bounded candidate additions/replacements with exact accepted-episode quotations, preserved existing identity/fact IDs, uncertainty notes and valid empty-change results. No full-memory replacement, deletion or automatic semantic conflict resolution is performed.
+- Require per-change selection and a human review before atomically writing a new memory version plus the acceptance record. Preserve unselected facts, historical snapshots and immutable decisions; reject stale series/memory inputs and tampered evidence.
+- Connect workbench and CLI review flows, including explicit display of replaced facts. Internal continuity analysis is separate from ordinary creative recipes and active editorial guidance.
+- Add original synthetic/model and authenticated HTTP tests, including rollback under a mid-commit failure. Real model consistency gains and browser acceptance remain pending.
+
 ## 0.14.0
 
 - Add bounded, versioned character memory for reviewed series: identity, appearance, relationships, state and editorial constraints, each with an exact source/accepted-episode citation and human review.

@@ -20,6 +20,7 @@ from .store import Store
 from .library import Library
 from .series import Series
 from .story_memory import StoryMemory
+from .continuity import Continuity
 from .research import Research
 from .lab import Lab
 from .mediaflow import Client as MediaFlowClient, MediaFlow
@@ -267,6 +268,18 @@ def main(argv=None):
             p.add_argument("--memory-version", type=int, required=True)
             p.add_argument("--reviewed", action="store_true")
             p.add_argument("--note", required=True)
+    p = sub.add_parser("continuity-new")
+    p.add_argument("id")
+    p.add_argument("series")
+    p.add_argument("--settings", type=Path, required=True)
+    p.add_argument("--key")
+    for command in ["continuity-inspect", "continuity-draft", "continuity-accept"]:
+        p = sub.add_parser(command)
+        p.add_argument("id")
+        if command == "continuity-accept":
+            p.add_argument("--selected", type=int, action="append", required=True)
+            p.add_argument("--note", required=True)
+            p.add_argument("--reviewed", action="store_true")
     args = parser.parse_args(argv)
     try:
         store = Store(args.data)
@@ -277,7 +290,16 @@ def main(argv=None):
         library = Library(store)
         series = Series(store, engine)
         research = Research(store, learning)
-        if args.command == "series-memory":
+        if args.command.startswith("continuity-"):
+            service = Continuity(store, cards)
+            action = args.command.removeprefix("continuity-")
+            if action == "new":
+                emit(service.create(args.id, args.series, json.loads(args.settings.read_text()), args.key))
+            elif action == "accept":
+                emit(service.accept(args.id, args.selected, args.note, args.reviewed))
+            else:
+                emit(getattr(service, action)(args.id))
+        elif args.command == "series-memory":
             emit(StoryMemory(store).inspect(args.series, args.version))
         elif args.command == "series-memory-update":
             emit(StoryMemory(store).update(args.series, json.loads(args.spec.read_text()), args.base_version, args.memory_version, args.note, args.reviewed))
@@ -430,7 +452,7 @@ def main(argv=None):
             identifier(args.profile)
             store.forget(args.profile)
             emit({"status": "preferences_routing_feedback_and_measurements_deleted",
-                  "retained": "character-memory versions/citations/reviews, research syntheses/experiments/evidence, media assets/music projects/rights/reviews, timeline versions/shot reviews/renders, workbench plans/actions, remote operation receipts, research subscriptions/evidence, books, series continuity, creative runs, artifacts (including embedded metrics), practice, evaluations and audit events"})
+                  "retained": "continuity proposals/selections, character-memory versions/citations/reviews, research syntheses/experiments/evidence, media assets/music projects/rights/reviews, timeline versions/shot reviews/renders, workbench plans/actions, remote operation receipts, research subscriptions/evidence, books, series continuity, creative runs, artifacts (including embedded metrics), practice, evaluations and audit events"})
         elif args.command == "models":
             emit([m.to_dict() for m in cards])
         elif args.command == "discover":

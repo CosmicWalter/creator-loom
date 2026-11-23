@@ -15,7 +15,7 @@ from .locking import run_lock
 
 
 def creative_tasks():
-    return {f"{fmt}:{step}": (fmt, step) for fmt, recipe in RECIPES.items() for step, _, _ in recipe if fmt != "research"}
+    return {f"{fmt}:{step}": (fmt, step) for fmt, recipe in RECIPES.items() for step, _, _ in recipe if fmt not in {"research", "continuity"}}
 
 
 SCHEMA = {

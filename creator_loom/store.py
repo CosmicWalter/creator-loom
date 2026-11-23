@@ -59,6 +59,12 @@ class Store:
                   id TEXT PRIMARY KEY, definition TEXT NOT NULL, cursor INTEGER NOT NULL DEFAULT 0,
                   version INTEGER NOT NULL DEFAULT 1, continuity TEXT NOT NULL DEFAULT '',
                   pending_run TEXT, created TEXT DEFAULT CURRENT_TIMESTAMP);
+                CREATE TABLE IF NOT EXISTS continuity_proposals (
+                  id TEXT PRIMARY KEY, series_id TEXT NOT NULL, run_id TEXT NOT NULL,
+                  context TEXT NOT NULL, state TEXT NOT NULL, review TEXT, result_version INTEGER,
+                  created TEXT DEFAULT CURRENT_TIMESTAMP);
+                CREATE TABLE IF NOT EXISTS continuity_requests (
+                  id TEXT PRIMARY KEY, fingerprint TEXT NOT NULL, proposal_id TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS story_memories (
                   series_id TEXT NOT NULL, version INTEGER NOT NULL, payload TEXT NOT NULL,
                   sha256 TEXT NOT NULL, review_note TEXT NOT NULL, created TEXT DEFAULT CURRENT_TIMESTAMP,
