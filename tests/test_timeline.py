@@ -136,6 +136,64 @@ class TimelineTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.timeline.inspect("edit")
 
+    def test_ducking_validation_and_legacy_edit_compatibility(self):
+        source = self.source("podcast", "narration")
+        spec = self.spec()
+        spec["music"] = {"source": source}
+        legacy = self.timeline.normalize(spec)
+        self.assertNotIn("ducking", legacy["music"])
+        self.assertEqual(self.timeline.normalize(legacy), legacy)
+        spec["music"]["ducking"] = True
+        with self.assertRaisesRegex(ValueError, "audible narration"):
+            self.timeline.normalize(spec)
+        spec["narration"] = {"source": source, "gain": 0}
+        with self.assertRaisesRegex(ValueError, "audible narration"):
+            self.timeline.normalize(spec)
+        spec["narration"]["gain"] = 1
+        for invalid in [1, "true", None, {}]:
+            spec["music"]["ducking"] = invalid
+            with self.assertRaisesRegex(ValueError, "boolean"):
+                self.timeline.normalize(spec)
+        spec["music"]["ducking"] = False
+        spec["narration"]["ducking"] = False
+        with self.assertRaises(ValueError):
+            self.timeline.normalize(spec)
+
+    def test_actual_ducking_preserves_voice_and_recovers_music_after_voice_ends(self):
+        narration = self.source("podcast", "narration")
+        self.frequency = 880
+        music = self.source("podcast", "narration")
+        spec = self.spec()
+        spec["shots"][0]["duration"] = 3
+        spec["narration"] = {"source": narration}
+        spec["music"] = {"source": music, "gain": 0.5, "loop": True}
+        measured = []
+        for name, duck in [("plain", False), ("ducked", True)]:
+            spec["music"]["ducking"] = duck
+            self.timeline.create(name, spec)
+            self.seal(name)
+            self.timeline.render(name, 1)
+            film = self.timeline.directory(name, 1)/"film.mp4"
+            pcm = media.command(["ffmpeg", "-v", "error", "-i", str(film), "-ac", "1", "-ar", "48000", "-f", "s16le", "pipe:1"])
+            samples = struct.unpack('<'+'h'*(len(pcm)//2), pcm)
+            def amplitude(start, end, frequency):
+                segment = samples[round(start*48000):round(end*48000)]
+                return abs(sum(x*complex(math.cos(i*2*math.pi*frequency/48000), -math.sin(i*2*math.pi*frequency/48000)) for i, x in enumerate(segment)))/len(segment)
+            measured.append([amplitude(0.3, 0.8, 440), amplitude(0.3, 0.8, 880), amplitude(2.4, 2.8, 880)])
+        plain, ducked = measured
+        self.assertAlmostEqual(ducked[0]/plain[0], 1, delta=0.08)
+        self.assertLess(ducked[1], plain[1]*0.5)
+        self.assertAlmostEqual(ducked[2]/plain[2], 1, delta=0.08)
+        self.timeline.approve("ducked", 1)
+        with zipfile.ZipFile(io.BytesIO(self.timeline.bundle("ducked"))) as archive:
+            edit = json.loads(archive.read("timeline.json"))
+            self.assertIs(edit["music"]["ducking"], True)
+        revised = self.timeline.inspect("ducked")["spec"]
+        revised["music"]["ducking"] = False
+        current = self.timeline.revise("ducked", revised, 1)
+        self.assertEqual(current["reviews"], [])
+        self.assertIs(self.timeline.inspect("ducked", 1)["spec"]["music"]["ducking"], True)
+
     def test_actual_two_shot_cuts_subtitles_mixed_audio_and_neutral_export(self):
         self.color = (20, 210, 30)
         second = self.source("cover", "cover")

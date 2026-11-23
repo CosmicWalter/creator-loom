@@ -57,6 +57,8 @@ TIMELINE_ERRORS = {
     "Shot exceeds its source video duration": "镜头的入点加时长超出了源视频，请缩短时长或提前入点。",
     "Audio in point is outside its source": "音频入点已超出源音频，请提前入点。",
     "Only music from in=0 can loop": "只有从 0 秒开始的音乐音轨可以循环。",
+    "Music ducking requires an audible narration track": "自动压低音乐需要有音量的旁白；请选择旁白或关闭自动压低。",
+    "Music ducking must be a boolean": "音乐自动压低选项需为开启或关闭。",
     "Zoom motion currently requires a still image": "居中推近仅支持静态图片，视频片段请使用保持原画面。",
     "Approve every shot before sealing the edit": "请先让每个镜头审核通过；已否决的镜头需另存新版本修改。",
     "Shot decision is immutable; revise the edit": "已保存的镜头审核不可覆盖，请基于此版编辑并保存新版本。",

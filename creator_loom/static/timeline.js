@@ -133,11 +133,12 @@ function renderTimelineEditor() {
       gain.oninput = () => { track.gain = Number(gain.value); timelineDirty(); }; start.oninput = () => { track.in = Number(start.value); timelineDirty(); };
       add(box, add(node("div", "field-grid"), field("音量倍数（0–2）", gain), field("音频入点（秒）", start)), preview);
       if (role === "music") { const loop = input("", "checkbox"); loop.checked = track.loop; loop.onchange = () => { track.loop = loop.checked; if (loop.checked) { track.in = 0; start.value = 0; } timelineDirty(); }; box.append(field("从头循环音乐（入点需为 0）", loop)); }
+      if (role === "music") { const duck = input("", "checkbox"); duck.checked = Boolean(track.ducking); duck.onchange = () => { track.ducking = duck.checked; timelineDirty(); }; box.append(field("旁白响起时自动压低音乐（需选择有音量的旁白）", duck)); }
       timelinePreview(track.source, preview);
     }
     sounds.append(box);
   }
-  sounds.append(node("p", "mini-note", "原视频音轨不进入混音。旁白不足时补静音；较长音轨裁至成片时长。音乐需要你确认有权使用。")); form.append(sounds);
+  sounds.append(node("p", "mini-note", "原视频音轨不进入混音。旁白不足时补静音；较长音轨裁至成片时长。自动压低依据旁白音量，不识别语义或说话人；请试听成片。音乐需要你确认有权使用。")); form.append(sounds);
   const captions = panel("字幕与时间"), end = spec.shots.reduce((n, s) => n + s.duration, 0);
   for (const [index, cue] of spec.captions.entries()) {
     const row = node("div", "timeline-caption"), start = timelineNumber(cue.start), stop = timelineNumber(cue.end), text = input(cue.text); text.required = true; text.maxLength = 500;
@@ -149,6 +150,7 @@ function renderTimelineEditor() {
   form.onsubmit = async event => {
     event.preventDefault(); if (!form.reportValidity()) return;
     if (!spec.shots.length) return toast("请先添加一个镜头。");
+    if (spec.music?.ducking && (!spec.narration || !spec.narration.gain)) return toast("自动压低音乐需要有音量的旁白；请选择旁白或关闭自动压低。");
     const controls = [...form.querySelectorAll("input,select,textarea,button")].map(control => [control, control.disabled]);
     for (const [control] of controls) control.disabled = true;
     try {
@@ -219,7 +221,7 @@ async function openTimeline(name, version) {
     root.append(p);
   }
   const sound = panel("声音与字幕设置");
-  for (const role of ["narration", "music"]) { const track = timeline.spec[role]; sound.append(node("p", "subtle", (role === "music" ? "音乐" : "旁白") + (track ? ` · 音量 ${track.gain} 倍 · 入点 ${track.in} 秒${track.loop ? " · 从头循环" : ""}` : " · 未使用"))); if (track) { const preview = node("div", "timeline-preview audio-preview"); sound.append(preview); timelinePreview(track.source, preview); } }
+  for (const role of ["narration", "music"]) { const track = timeline.spec[role]; sound.append(node("p", "subtle", (role === "music" ? "音乐" : "旁白") + (track ? ` · 音量 ${track.gain} 倍 · 入点 ${track.in} 秒${track.loop ? " · 从头循环" : ""}${track.ducking ? " · 旁白时自动压低" : ""}` : " · 未使用"))); if (track) { const preview = node("div", "timeline-preview audio-preview"); sound.append(preview); timelinePreview(track.source, preview); } }
   for (const cue of timeline.spec.captions) sound.append(node("p", "caption-summary", `${cue.start}–${cue.end} 秒 · ${cue.text}`));
   sound.append(node("p", "mini-note", "确认音轨与字幕配合后，再审核实际渲染的成片。")); root.append(sound);
   if (["needs_review", "approved"].includes(timeline.state)) {

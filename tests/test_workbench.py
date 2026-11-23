@@ -437,6 +437,24 @@ class WorkbenchTest(unittest.TestCase):
         return self.api("POST", "/api/assets", body, {"Idempotency-Key": request_key}), body, request_key
 
     @unittest.skipUnless(shutil.which("ffmpeg") and shutil.which("ffprobe"), "FFmpeg/FFprobe required")
+    def test_music_ducking_http_validation_and_saved_version(self):
+        timeline, _, _ = self.timeline_fixture()
+        asset, _, _ = self.media_audio()
+        self.api("POST", f"/api/assets/{asset['id']}/review", {"decision": "approve", "note": "Original synthetic audio checked for reuse."})
+        spec = timeline["spec"]
+        spec["music"] = {"source": {"asset": asset["id"]}, "ducking": True}
+        body = {"version": 1, "spec": spec}
+        status, _, raw = self.request("POST", "/api/timelines/edit/revise", body, {"Idempotency-Key": uuid.uuid4().hex})
+        self.assertEqual(status, 409)
+        self.assertIn("自动压低音乐需要有音量的旁白", json.loads(raw)["error"])
+        spec["narration"] = {"source": {"asset": asset["id"]}}
+        saved = self.api("POST", "/api/timelines/edit/revise", body, {"Idempotency-Key": uuid.uuid4().hex})
+        self.assertEqual(saved["version"], 2)
+        self.assertIs(saved["spec"]["music"]["ducking"], True)
+        self.assertIs(self.api("GET", "/api/timelines/edit")["spec"]["music"]["ducking"], True)
+        self.assertIsNone(self.api("GET", "/api/timelines/edit?version=1")["spec"]["music"])
+
+    @unittest.skipUnless(shutil.which("ffmpeg") and shutil.which("ffprobe"), "FFmpeg/FFprobe required")
     def test_authorized_media_http_import_review_and_timeline_sources(self):
         self.login()
         asset, body, key = self.media_audio()

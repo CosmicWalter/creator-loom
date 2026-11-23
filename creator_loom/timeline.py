@@ -103,8 +103,11 @@ class Timeline:
             if track is None:
                 tracks[role] = None
                 continue
-            if not isinstance(track, dict) or "source" not in track or set(track)-{"source", "in", "gain", "loop"}:
+            allowed = {"source", "in", "gain", "loop"} | ({"ducking"} if role == "music" else set())
+            if not isinstance(track, dict) or "source" not in track or set(track)-allowed:
                 raise ValueError("Audio track needs source and optional in/gain/loop")
+            if "ducking" in track and type(track["ducking"]) is not bool:
+                raise ValueError("Music ducking must be a boolean")
             start = bounded(track.get("in", 0), 0, 3600, "audio in point")
             gain = bounded(track.get("gain", 1 if role == "narration" else 0.15), 0, 2, "audio gain")
             loop = track.get("loop", False)
@@ -114,6 +117,10 @@ class Timeline:
             if start >= media.duration(info, "audio"):
                 raise ValueError("Audio in point is outside its source")
             tracks[role] = {"source": ref, "in": start, "gain": gain, "loop": loop}
+            if "ducking" in track:
+                tracks[role]["ducking"] = track["ducking"]
+        if tracks["music"] and tracks["music"].get("ducking") and (not tracks["narration"] or tracks["narration"]["gain"] == 0):
+            raise ValueError("Music ducking requires an audible narration track")
         captions, end = [], 0.0
         if not isinstance(spec.get("captions", []), list) or len(spec.get("captions", [])) > 1000:
             raise ValueError("Provide at most 1000 caption cues")
@@ -257,6 +264,8 @@ class Timeline:
         for role in ["narration", "music"]:
             track = spec[role]
             result[role] = {k: track[k] for k in ["in", "gain", "loop"]} | {"source_sha256": track["source"]["sha256"]} if track else None
+            if track and "ducking" in track:
+                result[role]["ducking"] = track["ducking"]
         asset_ids = {s["source"]["asset"] for s in spec["shots"] if "asset" in s["source"]}
         asset_ids.update(spec[k]["source"]["asset"] for k in ["narration", "music"] if spec[k] and "asset" in spec[k]["source"])
         result["credits"] = [Assets(self.store).credits(name) for name in sorted(asset_ids)]

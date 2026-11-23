@@ -49,6 +49,8 @@ Create an edit with a title, canvas and frame rate. Add shots, move them earlier
 
 Select narration/music from approved audio, set in points and gains, and optionally loop music from the beginning. Add ordered plain-text captions with explicit times. These are manual timings, not automatic transcription or word alignment. Original video audio is not retained unless it is an explicitly selected supported audio track.
 
+The music track offers **旁白响起时自动压低音乐** when a narration track with nonzero gain is selected. It is off by default; the saved edit review and exported manifest preserve the choice. Listen for quiet speech, noise-triggered attenuation and music recovery before approving. See [timeline sound controls](timeline.md#sound-and-captions) for the signal-level behavior and fixed settings.
+
 Saving creates a frozen edit version. Inspect each shot and record approval/rejection with a reason; decisions cannot be overwritten with a different review. Once all shots are approved, seal and start local rendering. Work proceeds in the background with a persisted action key; refreshing does not resubmit it. Version-bound actions cannot silently render a newer edit, and server restart marks unfinished web actions interrupted rather than replaying them.
 
 Inspect the actual film, use the subtitle menu for derived WebVTT captions where supported, then approve the final film before downloading its MP4/SRT/edit-manifest ZIP. Every preview, review and delivery retains source/output integrity checks. Historical versions can still be viewed and approved historical deliveries downloaded; editing from a historical version saves a new version against the current revision.

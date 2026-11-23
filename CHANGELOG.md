@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.16.0
+
+- Add opt-in narration-driven music ducking to the reviewed timeline, with a workbench switch, review summary and preserved public edit setting. Existing edits retain fixed-gain mixing by default.
+- Compress music from the post-gain narration signal with fixed bounded sidechain settings; retain the audible narration, recover music during silence and preserve the existing final limiter. Reject invalid options and missing/muted narration.
+- Verify actual FFmpeg output against a fixed-gain control using decoded tone amplitudes: music attenuation during narration, unchanged narration and music recovery after narration ends. Review/version/export invariants remain in force.
+- This is signal-level mixing, not speech recognition or measured creative-quality improvement. Loudness normalization, live-provider validation and browser acceptance remain pending.
+
 ## 0.15.0
 
 - Add model-assisted continuity proposals over the latest accepted text episode and a frozen character-memory snapshot, with explicit plan/execute/approve boundaries and stable reservation keys.

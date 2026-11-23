@@ -109,6 +109,13 @@ def render(spec, sources, directory):
                              f"volume={track['gain']},apad,atrim=duration={spec['duration']}[{label}]")
         audio_inputs.append(f"[{label}]")
     if audio_inputs:
+        if spec["music"] and spec["music"].get("ducking"):
+            # Both streams have the frozen edit duration, including narration's silent tail.
+            # Split the post-gain narration so the sidechain never consumes the audible copy.
+            audio_filters += ["[track1]asplit=2[voice][control]",
+                              "[track2][control]sidechaincompress=threshold=0.015625:ratio=8:attack=20:release=350:"
+                              "knee=2.828427:makeup=1:detection=rms:link=average[ducked]"]
+            audio_inputs = ["[voice]", "[ducked]"]
         audio_filters.append("".join(audio_inputs)+f"amix=inputs={len(audio_inputs)}:normalize=0,alimiter=limit=0.95:latency=1[mix]")
         args += ["-filter_complex", ";".join(audio_filters)]
     captions = spec["captions"]

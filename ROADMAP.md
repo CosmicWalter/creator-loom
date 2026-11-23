@@ -22,7 +22,8 @@ This is a delivery backlog, not a promise that the complete product is already a
 - [x] Reserve upstream output bounds against downstream input capacity in joint allocation.
 - [ ] Calibrate model priors and quality dimensions using reviewed real-provider creative tasks and actual billing evidence.
 - [x] Authorized reference-voice selection and local CLI timeline with reviewed cuts, still-image zoom, explicit subtitle timing and narration/music mixing.
-- [ ] Automatic speech alignment, ducking/loudness controls, transitions and generative video delivery.
+- [x] Optional narration-driven music ducking in CLI/workbench edits, preserved in reviewed versions and export; decoded audio attenuation/recovery verified with actual FFmpeg.
+- [ ] Automatic speech alignment, loudness normalization, transitions and generative video delivery.
 - [x] MediaFlow narration adapter with frozen segment requests, persistent remote IDs, safe polling/download recovery and explicit reconciliation.
 - [ ] ComfyUI adapter, MediaFlow transcription delivery and additional asynchronous model providers.
 - [x] Bounded TXT/unencrypted EPUB import, chapter/unit provenance and reviewed sequential creation with frozen continuity notes.

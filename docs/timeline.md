@@ -34,7 +34,15 @@ Every source is rechecked before review, sealing and rendering, and again after 
 
 ## Sound and captions
 
-Narration and music each select an approved WAV. `gain` ranges from 0 to 2; the default is 1 for narration and 0.15 for music. Both tracks are resampled to 48 kHz stereo and mixed with a limiter. Short narration is padded with silence; audio longer than the edit is trimmed. Music can loop only when its `in` point is zero. Clip source audio is deliberately omitted: only the explicit narration and music tracks are mixed. There is no automatic ducking or loudness normalization.
+Narration and music each select an approved WAV. `gain` ranges from 0 to 2; the default is 1 for narration and 0.15 for music. Both tracks are resampled to 48 kHz stereo and mixed with a limiter. Short narration is padded with silence; audio longer than the edit is trimmed. Music can loop only when its `in` point is zero. Clip source audio is deliberately omitted: only the explicit narration and music tracks are mixed. Music can opt in to `"ducking": true` (default off). It requires a selected narration track with nonzero gain. The renderer uses post-gain narration as the control signal to compress only music, then mixes the unchanged narration and ducked music through the existing limiter. When narration becomes quiet or ends, music gradually recovers. The workbench exposes the switch and shows the saved setting during review; the exported edit manifest preserves it. Changing the switch creates another edit version and resets reviews, as with other sound edits.
+
+The fixed sidechain settings are a linear RMS threshold of 0.015625 (about −36 dBFS), 8:1 ratio, 20 ms attack, 350 ms release, soft knee 2.828427, average stereo linking and unity makeup. This is signal-level ducking: quiet speech below the threshold may not reduce music, while noise or other sounds in the narration can trigger it. The music gain remains the upper level; very quiet tracks may stay quiet after recovery. It does not identify speech, align subtitles, normalize loudness or guarantee intelligibility. Listen to the actual output before approval. Existing saved edits without the option retain their original fixed-gain mix.
+
+For example, add the option to a selected approved music reference:
+
+```json
+{"source":{"asset":"APPROVED_MUSIC_ASSET"},"gain":0.3,"loop":true,"ducking":true}
+```
 
 Captions specify `start`, `end` and plain `text`, in ordered, non-overlapping seconds within the edit. The renderer delivers UTF-8 SRT and a selectable MP4 subtitle track. Captions are not burned into the picture. Timing is provided by the editor; there is no speech recognition, forced alignment or word-level synchronization in this feature. Caption rendering and fonts depend on the playback application.
 
@@ -60,4 +68,4 @@ Export requires final approval and verifies both source and output hashes. The Z
 
 ## Verification and limits
 
-Tests use original synthetic images and sine-wave audio with actual FFmpeg: cuts are checked by decoded frame colors, zoom by changing decoded frames, audio mixing and looping by decoded frequencies, captions by actual stream presence, and source tags by inspection of the final container. Model inference is simulated; this is media execution evidence, not creative-quality evidence. The workbench now exposes source selection, shot/timing/sound/caption editing, review, rendering and delivery; see [the editing room](workbench.md#editing-room). HTTP/media execution is verified; browser/visual acceptance remains pending.
+Tests use original synthetic images and sine-wave audio with actual FFmpeg: cuts are checked by decoded frame colors, zoom by changing decoded frames, audio mixing and looping by decoded frequencies, optional ducking by comparing decoded music/voice frequencies against a fixed-gain control and checking recovery after narration ends, captions by actual stream presence, and source tags by inspection of the final container. Model inference is simulated; this is media execution evidence, not creative-quality evidence. The workbench now exposes source selection, shot/timing/sound/caption editing, review, rendering and delivery; see [the editing room](workbench.md#editing-room). HTTP/media execution is verified; browser/visual acceptance remains pending.
